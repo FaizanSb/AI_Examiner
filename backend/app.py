@@ -143,9 +143,10 @@ def create_student():
             return jsonify({'error': 'Name and email are required'}), 400
         
         # Check if student already exists
-        existing = Student.find_by_email(email)
+        existing = Student.find_by_email(email) or Student.find_by_roll_number(roll_number) if roll_number else None
+        
         if existing:
-            return jsonify({'error': 'Student with this email already exists'}), 400
+            return jsonify({'error': 'Roll No and Email must be unique'}), 400
         
         student = Student.create(name, email, roll_number, class_name)
         return jsonify({
