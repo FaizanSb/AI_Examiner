@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FiUsers, FiFileText, FiTrendingUp } from 'react-icons/fi';
-import { getAllTeachers, getAllStudents } from '../services/api';
+import { getAllTeachers, getAllStudents, getEvaluations } from '../services/api';
 import './Dashboard.css';
 
 const Dashboard = ({ setLoading }) => {
@@ -15,18 +15,28 @@ const Dashboard = ({ setLoading }) => {
   const loadDashboardData = async () => {
     try {
       setLoading(true, 'Loading dashboard data...');
-      const [teachersRes, studentsRes] = await Promise.all([
+      const [teachersRes, studentsRes, evaluationsRes] = await Promise.all([
         getAllTeachers(),
-        getAllStudents()
+        getAllStudents(),
+        getEvaluations()
       ]);
 
-      setTeachers(teachersRes.teachers || []);
-      setStudents(studentsRes.students || []);
+      // Debug kar — console mein dekh kya aa raha hai
+      console.log('Evaluations Response:', evaluationsRes);
+
+      const teachersList = teachersRes?.teachers || [];
+      const studentsList = studentsRes?.students || [];
+
+      // Flexible extraction — jo bhi key ho
+      const evalCount = Array.isArray(evaluationsRes) ? evaluationsRes.length : 0;
+
+      setTeachers(teachersList);
+      setStudents(studentsList);
 
       setStats({
-        totalTeachers: teachersRes.teachers?.length || 0,
-        totalStudents: studentsRes.students?.length || 0,
-        totalEvaluations: 0
+        totalTeachers: teachersList.length,
+        totalStudents: studentsList.length,
+        totalEvaluations: evalCount
       });
     } catch (err) {
       console.error('Error loading dashboard:', err);
@@ -45,7 +55,6 @@ const Dashboard = ({ setLoading }) => {
       <div className="dashboard-container">
         <h1 className="page-title">Dashboard</h1>
 
-        {/* Stats Cards */}
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-icon teachers">

@@ -1,0 +1,44 @@
+Folder PATH listing for volume New Volume
+Volume serial number is 72EC-10B2
+D:.
+¦   .env
+¦   .env.example
+¦   app.py
+¦   config.py
+¦   requirements.txt
+¦   structure.txt
+¦   
++---models
+¦   ¦   evaluation.py
+¦   ¦   student.py
+¦   ¦   teacher.py
+¦   ¦   
+¦   +---__pycache__
+¦           evaluation.cpython-310.pyc
+¦           evaluation.cpython-312.pyc
+¦           student.cpython-310.pyc
+¦           student.cpython-312.pyc
+¦           teacher.cpython-310.pyc
+¦           teacher.cpython-312.pyc
+¦           
++---uploads
+¦       test.jpg
+¦       
++---utils
+¦   ¦   db_connection.py
+¦   ¦   gemini_service.py
+¦   ¦   init.py
+¦   ¦   pdf_processor.py
+¦   ¦   
+¦   +---__pycache__
+¦           db_connection.cpython-310.pyc
+¦           db_connection.cpython-312.pyc
+¦           gemini_service.cpython-310.pyc
+¦           gemini_service.cpython-312.pyc
+¦           pdf_processor.cpython-310.pyc
+¦           pdf_processor.cpython-312.pyc
+¦           
++---__pycache__
+        config.cpython-310.pyc
+        config.cpython-312.pyc
+        
