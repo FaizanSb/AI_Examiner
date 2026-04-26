@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiEye, FiDownload, FiX, FiChevronDown, FiTrash2 } from 'react-icons/fi';
 import { getEvaluations, deleteEvaluation } from '../services/api';
+import gcufLogo from '../assets/gcufLogo.jpg';
 import '../pages/EvaluationHistory.css';
 
 function EvaluationHistory() {
@@ -10,19 +11,28 @@ function EvaluationHistory() {
   const [error, setError] = useState('');
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
-  
+
   // Filter states
   const [searchStudent, setSearchStudent] = useState('');
   const [searchRollNo, setSearchRollNo] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  
+
   // Extracted teachers list
   const [teachers, setTeachers] = useState([]);
 
   useEffect(() => {
     fetchEvaluations();
   }, []);
+
+  const toBase64 = (url) =>
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    }));
 
   const fetchEvaluations = async () => {
     try {
@@ -31,18 +41,18 @@ function EvaluationHistory() {
       console.log('Fetching evaluations...');
       const data = await getEvaluations();
       console.log('Raw API response:', data);
-      
+
       // Handle both array response and object response
       const evaluations = Array.isArray(data) ? data : (data.evaluations || data || []);
       console.log('Processed evaluations:', evaluations);
       console.log('Number of evaluations:', evaluations.length);
-      
+
       setEvaluations(evaluations);
-      
+
       // Extract unique teachers
       const uniqueTeachers = [...new Set(evaluations.map(e => e.teacher_name).filter(t => t))];
       setTeachers(uniqueTeachers);
-      
+
       setFilteredEvaluations(evaluations);
       setError('');
     } catch (err) {
@@ -131,7 +141,8 @@ function EvaluationHistory() {
     return gradeColors[grade] || 'var(--text-secondary)';
   };
 
-  const handleDownloadEvaluation = (evaluation) => {
+  const handleDownloadEvaluation = async (evaluation) => {
+    const logoBase64 = await toBase64(gcufLogo);  // 2. yahan call karo
     // Create HTML content for PDF
     const htmlContent = `
       <!DOCTYPE html>
@@ -166,11 +177,18 @@ function EvaluationHistory() {
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>Evaluation Report</h1>
-            <p>AI Examiner - Assessment Result</p>
-          </div>
+        <div class="header">
+  <div style="display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:12px;">
+    <img src="${logoBase64}" alt="GCUF Logo" style="width:70px; height:70px; object-fit:contain;" />
+    <div style="text-align:center;">
+      <div style="font-size:13px; font-weight:600; color:#555; letter-spacing:0.05em; text-transform:uppercase;">Government College University Faisalabad</div>
+     
+      <div style="font-size:11px; color:#888; margin-top:2px;">Department of Computer Science</div>
+    </div>
+  </div>
+  <h1>Evaluation Report</h1>
+  <p>AI Examiner - Assessment Result</p>
+</div>
 
           <div class="section">
             <h2>Student Information</h2>
@@ -255,13 +273,13 @@ function EvaluationHistory() {
     // Create a blob from the HTML content
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = window.URL.createObjectURL(blob);
-    
+
     // Create an iframe to print to PDF
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = url;
     document.body.appendChild(iframe);
-    
+
     // Print to PDF after iframe loads
     iframe.onload = () => {
       setTimeout(() => {
@@ -457,8 +475,8 @@ function EvaluationHistory() {
                       <div className="details-section">
                         <h4>Strengths</h4>
                         <ul className="points-list">
-                          {(Array.isArray(evaluation.strengths) 
-                            ? evaluation.strengths 
+                          {(Array.isArray(evaluation.strengths)
+                            ? evaluation.strengths
                             : evaluation.strengths.split('\n').filter(s => s.trim())
                           ).map((strength, idx) => (
                             <li key={idx}>{strength}</li>
