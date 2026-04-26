@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiUsers, FiFileText, FiTrendingUp } from 'react-icons/fi';
 import { getAllTeachers, getAllStudents, getEvaluations } from '../services/api';
 import './Dashboard.css';
+//import './dash.css';
 
 const Dashboard = ({ setLoading }) => {
   const [stats, setStats] = useState({

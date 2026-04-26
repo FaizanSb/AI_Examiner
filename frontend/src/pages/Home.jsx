@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FiArrowRight, FiCheckCircle, FiZap, FiBarChart2 } from 'react-icons/fi';
 import './Home.css';
-
+//import './home1.css';
 const Home = () => {
   return (
     <div className="home">
