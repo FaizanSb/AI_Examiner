@@ -181,7 +181,7 @@ function EvaluationHistory() {
   <div style="display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:12px;">
     <img src="${logoBase64}" alt="GCUF Logo" style="width:70px; height:70px; object-fit:contain;" />
     <div style="text-align:center;">
-      <div style="font-size:13px; font-weight:600; color:#555; letter-spacing:0.05em; text-transform:uppercase;">Government College University Faisalabad</div>
+      <div style="font-size:13px; font-weight:600; color:#555; letter-spacing:0.05em; text-transform:uppercase; font-weight:bold;">Government College University Faisalabad</div>
      
       <div style="font-size:11px; color:#888; margin-top:2px;">Department of Computer Science</div>
     </div>
