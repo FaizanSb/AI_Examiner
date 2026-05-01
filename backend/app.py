@@ -8,6 +8,7 @@ from models.teacher import Teacher
 from models.student import Student
 from models.evaluation import Evaluation
 from bson import ObjectId
+from utils.bulk_processor import process_bulk_pdf
 import os
 import logging
 
@@ -391,6 +392,39 @@ def get_evaluation(evaluation_id):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/evaluate/bulk', methods=['POST'])
+def bulk_evaluation():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        pdf = request.files['file']
+        teacher_answer = request.form.get('teacher_answer')
+        teacher_name = request.form.get('teacher_name')
+        teacher_email = request.form.get('teacher_email')
+
+        pdf_path = pdf_processor.save_uploaded_file(pdf, app.config['UPLOAD_FOLDER'])
+
+        result = process_bulk_pdf(
+            pdf_path,
+            teacher_answer,
+            {
+                "name": teacher_name,
+                "email": teacher_email
+            },
+            gemini_service
+        )
+
+        return jsonify({
+            "success": True,
+            "status": "success",
+            "students": result,
+            "count": len(result)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/evaluations/student/<student_id>', methods=['GET'])
 def get_student_evaluations(student_id):
@@ -503,3 +537,4 @@ if __name__ == '__main__':
     finally:
         # Close database connection on shutdown
         db_connection.close()
+        logger.info("Database connection closed")
