@@ -4,6 +4,7 @@ import Navigation from './components/Navigation';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Evaluate from './pages/Evaluate';
+import EvaluateBatch from './pages/EvaluateBatch';
 import Results from './pages/Results';
 import Management from './pages/Management';
 import EvaluationHistory from './pages/EvaluationHistory';
@@ -34,6 +35,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard setLoading={setAppLoading} />} />
           <Route path="/evaluate" element={<Evaluate setLoading={setAppLoading} />} />
+          <Route path="/EvaluateBatch" element={<EvaluateBatch setLoading={setAppLoading} />} />
           <Route path="/results/:evaluationId" element={<Results />} />
           <Route path="/management" element={<Management setLoading={setAppLoading} />} />
           <Route path="/history" element={<EvaluationHistory setLoading={setAppLoading} />} />

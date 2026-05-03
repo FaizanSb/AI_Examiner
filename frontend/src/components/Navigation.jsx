@@ -11,7 +11,7 @@ const Navigation = () => {
   const navigate = useNavigate();
 
   const isActive = (path) => location.pathname === path;
-  const isEvalActive = location.pathname === '/evaluate' || location.pathname === '/evaluate/class';
+  const isEvalActive = location.pathname === '/evaluate' || location.pathname === '/EvaluateBatch';
 
   useEffect(() => {
     const handler = (e) => {
@@ -83,7 +83,7 @@ const Navigation = () => {
                 </button>
                 <button
                   className="eval-dd-item"
-                  onClick={() => { navigate('/evaluate/class'); setIsEvalOpen(false); }}
+                  onClick={() => { navigate('/EvaluateBatch'); setIsEvalOpen(false); }}
                 >
                   <span className="eval-dd-icon batch"><FiUsers size={15} /></span>
                   <div>
@@ -98,11 +98,20 @@ const Navigation = () => {
 
             {/* Mobile: two separate links */}
             <div className="eval-mobile-links">
-              <Link to="/evaluate" className="nav-link nav-link-primary eval-mobile-single" onClick={handleMobileClose}>
+              <Link
+                to="/evaluate"
+                className="nav-link nav-link-primary eval-mobile-single"
+                onClick={handleMobileClose}
+              >
                 <FiUser size={14} /> Single Student
               </Link>
-              <Link to="/evaluate/class" className="nav-link eval-mobile-batch" onClick={handleMobileClose}>
-                <FiUsers size={14} /> Entire Class <span className="eval-badge">Batch</span>
+              <Link
+                to="/EvaluateBatch"
+                className="nav-link eval-mobile-batch"
+                onClick={handleMobileClose}
+              >
+                <FiUsers size={14} /> Entire Class
+                <span className="eval-badge">Batch</span>
               </Link>
             </div>
           </li>

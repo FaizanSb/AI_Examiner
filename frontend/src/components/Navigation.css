@@ -290,6 +290,12 @@
     flex-direction: column;
     gap: 0.5rem;
   }
+  .eval-mobile-links a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
 
   .eval-mobile-single {
     justify-content: center;
@@ -302,6 +308,7 @@
     color: var(--text-secondary);
     padding: 0.4rem 0;
     font-size: 0.9rem;
+    margin-left: 6px;
   }
 
   .eval-mobile-batch:hover { color: #fff; }
