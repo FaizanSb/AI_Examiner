@@ -11,12 +11,14 @@ from bson import ObjectId
 from utils.bulk_processor import process_bulk_pdf
 import os
 import logging
+from routes.auth_routes import auth_bp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+app.register_blueprint(auth_bp, url_prefix="/api/auth")
 # Configure CORS for both development and production
 cors_origins = [
     'http://localhost:3000',  # Local development
