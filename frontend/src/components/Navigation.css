@@ -32,31 +32,20 @@
 .navbar-logo:hover,
 .navbar-logo:active {
   color: var(--primary-light);
-  transform: scale(1.06);
-  text-shadow: 0 0 12px rgba(96, 165, 250, 0.6);
-}
-
-.navbar-logo:hover {
   transform: scale(1.05);
+  text-shadow: 0 0 12px rgba(96, 165, 250, 0.6);
 }
 
 .logo-icon {
   font-size: 2rem;
-  color: var(--text-primary);
   transition: all 0.3s ease;
 }
 
-.navbar-logo:hover .logo-icon,
-.navbar-logo:active .logo-icon {
-  color: var(--primary-light);
+.navbar-logo:hover .logo-icon {
   filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.6));
 }
 
-.navbar-logo:active {
-  transform: scale(0.98);
-  text-shadow: 0 0 16px rgba(59, 130, 246, 0.8);
-}
-
+/* ── Nav Menu ── */
 .nav-menu {
   display: flex;
   list-style: none;
@@ -76,6 +65,10 @@
   position: relative;
   padding: 0.5rem 0;
   letter-spacing: 0.2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
 }
 
 .nav-link:hover,
@@ -102,11 +95,14 @@
 
 .nav-link-primary {
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 1.5rem !important;
   border-radius: 10px;
   color: white !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .nav-link-primary::after {
@@ -119,20 +115,133 @@
   filter: brightness(1.08);
 }
 
+/* ── Evaluate Button ── */
+.eval-desktop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eval-chevron {
+  transition: transform 0.25s ease;
+  margin-left: 2px;
+}
+
+.eval-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ── Dropdown ── */
+.eval-item {
+  position: relative;
+}
+
+.eval-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: rgba(10, 15, 30, 0.98);
+  border: 1px solid rgba(108, 99, 255, 0.35);
+  border-radius: 12px;
+  min-width: 250px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  overflow: hidden;
+  animation: evalDDIn 0.18s ease;
+  backdrop-filter: blur(12px);
+}
+
+@keyframes evalDDIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.eval-dd-header {
+  padding: 10px 15px 7px;
+  font-size: 10px;
+  color: #5a6a8a;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.eval-dd-item {
+  width: 100%;
+  padding: 12px 15px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #c8d3ec;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.eval-dd-item:last-child { border-bottom: none; }
+
+.eval-dd-item:hover {
+  background: rgba(108, 99, 255, 0.2);
+  color: #fff;
+}
+
+.eval-dd-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.eval-dd-icon.single { background: rgba(108, 99, 255, 0.25); color: #a78bfa; }
+.eval-dd-icon.batch  { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+
+.eval-dd-title {
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e2e8f0;
+}
+
+.eval-dd-sub {
+  font-size: 11px;
+  color: #5a6a8a;
+  margin-top: 2px;
+}
+
+.eval-badge {
+  display: inline-block;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Mobile ── */
 .mobile-menu-toggle {
   display: none;
   background: none;
   border: none;
   color: var(--text-primary);
   cursor: pointer;
-  font-size: 1.5rem;
 }
 
-/* Mobile Responsive */
+.eval-mobile-links { display: none; }
+.eval-desktop-btn  { display: inline-flex; }
+
 @media (max-width: 768px) {
-  .mobile-menu-toggle {
-    display: block;
-  }
+  .mobile-menu-toggle { display: block; }
 
   .nav-menu {
     position: absolute;
@@ -149,7 +258,7 @@
   }
 
   .nav-menu.active {
-    max-height: 300px;
+    max-height: 400px; /* thoda zyada — eval ke 2 links fit hon */
   }
 
   .nav-item {
@@ -164,11 +273,36 @@
     width: 100%;
   }
 
-  .nav-link::after {
-    display: none;
-  }
+  .nav-link::after { display: none; }
 
   .nav-link-primary {
-    padding: 0.75rem 0;
+    padding: 0.75rem 0 !important;
+    text-align: center;
+    justify-content: center;
   }
+
+  /* Hide desktop eval button on mobile */
+  .eval-desktop-btn { display: none; }
+
+  /* Show mobile links */
+  .eval-mobile-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .eval-mobile-single {
+    justify-content: center;
+  }
+
+  .eval-mobile-batch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+  }
+
+  .eval-mobile-batch:hover { color: #fff; }
 }

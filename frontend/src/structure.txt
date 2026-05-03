@@ -1,0 +1,42 @@
+Folder PATH listing for volume New Volume
+Volume serial number is 72EC-10B2
+D:.
+¦   App.css
+¦   App.js
+¦   App.test.js
+¦   index.css
+¦   index.js
+¦   logo.svg
+¦   reportWebVitals.js
+¦   setupTests.js
+¦   structure.txt
+¦   
++---assets
+¦       gcufLogo.jpg
+¦       
++---components
+¦       ExamEvaluator.jsx
+¦       FileUpload.jsx
+¦       Navigation.css
+¦       Navigation.jsx
+¦       Results.jsx
+¦       
++---pages
+¦       dash.css
+¦       Dashboard.css
+¦       Dashboard.jsx
+¦       Evaluate.css
+¦       Evaluate.jsx
+¦       EvaluationHistory.css
+¦       EvaluationHistory.jsx
+¦       Home.css
+¦       Home.jsx
+¦       home1.css
+¦       Management.css
+¦       Management.jsx
+¦       Results.css
+¦       Results.jsx
+¦       
++---services
+        api.js
+        

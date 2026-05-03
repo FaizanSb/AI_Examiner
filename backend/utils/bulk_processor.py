@@ -2,16 +2,18 @@ from utils.pdf_processor import PDFProcessor
 
 def process_bulk_pdf(pdf_path, teacher_answer, teacher_info, gemini_service):
     """
-    FINAL BULK PROCESSOR (HANDWRITTEN SUPPORT)
+    BULK PROCESSOR (HANDWRITTEN SUPPORT)
     PDF → Images → Gemini → Extract + Evaluate → JSON
     """
 
     try:
-        
-        # ✅ Convert full PDF to images
+        # ✅ Convert PDF to images
         images = PDFProcessor.convert_pdf_to_images(pdf_path, max_pages=50)
 
-        # ✅ Prompt for Gemini
+        if not images:
+            return []
+
+        # ✅ Prompt
         prompt = f"""
 You are an expert examiner.
 
@@ -43,20 +45,21 @@ TEACHER ANSWER:
 {teacher_answer}
 """
 
-        # ✅ Gemini Vision Call (IMPORTANT FORMAT)
-        print("🔥 GEMINI INPUT READY")
-        print("IMAGES COUNT:", len(images))
+        # ✅ Gemini Call
+        print("🔥 BULK PROCESS START")
+        print("Images:", len(images))
+
         contents = [prompt, *images]
         response = gemini_service.model.generate_content(contents)
-        
-        print("🔥 RAW GEMINI RESPONSE:")
+
+        print("🔥 GEMINI RESPONSE:")
         print(response.text)
 
-        # ✅ Parse JSON safely
+        # ✅ Parse JSON
         result = gemini_service._parse_json(response.text)
 
         return result if result else []
 
     except Exception as e:
-        print("Bulk Processing Error:", e)
+        print("❌ Bulk Processing Error:", e)
         return []
