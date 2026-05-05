@@ -8,6 +8,9 @@ import EvaluateBatch from './pages/EvaluateBatch';
 import Results from './pages/Results';
 import Management from './pages/Management';
 import EvaluationHistory from './pages/EvaluationHistory';
+import ProtectedRoute from './utils/ProtectedRoute'; // ✅ added
+import Login from './pages/login';    // 👈 add karo
+import Signup from './pages/Signup';  // 👈 add karo
 import './App.css';
 
 function App() {
@@ -33,12 +36,28 @@ function App() {
         )}
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard setLoading={setAppLoading} />} />
-          <Route path="/evaluate" element={<Evaluate setLoading={setAppLoading} />} />
-          <Route path="/EvaluateBatch" element={<EvaluateBatch setLoading={setAppLoading} />} />
-          <Route path="/results/:evaluationId" element={<Results />} />
-          <Route path="/management" element={<Management setLoading={setAppLoading} />} />
-          <Route path="/history" element={<EvaluationHistory setLoading={setAppLoading} />} />
+
+          {/* ✅ Protected Routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute><Dashboard setLoading={setAppLoading} /></ProtectedRoute>
+          } />
+          <Route path="/evaluate" element={
+            <ProtectedRoute><Evaluate setLoading={setAppLoading} /></ProtectedRoute>
+          } />
+          <Route path="/EvaluateBatch" element={
+            <ProtectedRoute><EvaluateBatch setLoading={setAppLoading} /></ProtectedRoute>
+          } />
+          <Route path="/results/:evaluationId" element={
+            <ProtectedRoute><Results /></ProtectedRoute>
+          } />
+          <Route path="/management" element={
+            <ProtectedRoute><Management setLoading={setAppLoading} /></ProtectedRoute>
+          } />
+          <Route path="/history" element={
+            <ProtectedRoute><EvaluationHistory setLoading={setAppLoading} /></ProtectedRoute>
+          } />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
         </Routes>
       </div>
     </Router>

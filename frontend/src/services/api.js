@@ -1,10 +1,19 @@
 import axios from 'axios';
+import { getToken } from '../utils/auth'; 
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000, // 2 minutes - Gemini vision is much faster than EasyOCR
+});
+
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Teacher APIs
@@ -72,24 +81,21 @@ export const uploadModelAnswer = async (file) => {
   return response.data;
 };
 
-export const evaluateAnswer = async (formDataOrFile, modelAnswer, maxMarks, question = '', teacherId = null, studentId = null) => {
-  // Handle both FormData object and individual parameters
+export const evaluateAnswer = async (formDataOrFile, modelAnswer, maxMarks, question = '', studentId = null) => {
   let formData;
-  
+
   if (formDataOrFile instanceof FormData) {
-    // If FormData is passed directly, use it as-is
     formData = formDataOrFile;
   } else {
-    // Otherwise create FormData from individual parameters
     formData = new FormData();
     formData.append('student_file', formDataOrFile);
     formData.append('model_answer', modelAnswer);
     formData.append('max_marks', maxMarks);
     if (question) formData.append('question', question);
-    if (teacherId) formData.append('teacher_id', teacherId);
     if (studentId) formData.append('student_id', studentId);
+    // ✅ teacher_id hata di — backend token se lega
   }
-  
+
   const response = await api.post('/evaluate-answer', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
@@ -111,10 +117,12 @@ export const getStudentEvaluations = async (studentId, limit = 10) => {
   return response.data;
 };
 
-export const getTeacherEvaluations = async (teacherId, limit = 10) => {
-  const response = await api.get(`/evaluations/teacher/${teacherId}?limit=${limit}`);
+// ✅ Naya — token se automatically pata chalega
+export const getTeacherEvaluations = async (limit = 10) => {
+  const response = await api.get(`/evaluations/teacher?limit=${limit}`);
   return response.data;
 };
+
 
 export const getRecentEvaluations = async (limit = 20) => {
   const response = await api.get(`/evaluations/recent?limit=${limit}`);
