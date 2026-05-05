@@ -1,4 +1,6 @@
 from datetime import datetime
+import email
+from os import name
 from bson import ObjectId
 from utils.db_connection import db_connection
 
@@ -9,16 +11,15 @@ class Teacher:
         return db_connection.get_collection('teachers')
     
     @staticmethod
-    def create(name, email, subject=None):
-        """Create a new teacher"""
+    def create(name, email, password, subject=None):  # 👈 password add
         teacher = {
-            'name': name,
-            'email': email,
-            'subject': subject,
-            # "admin": True,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
-        }
+        'name': name,
+        'email': email,
+        'password': password,  # 👈 ye add
+        'subject': subject,
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow()
+    }
         
         result = Teacher.get_collection().insert_one(teacher)
         teacher['_id'] = result.inserted_id

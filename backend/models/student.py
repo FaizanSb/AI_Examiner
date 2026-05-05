@@ -9,13 +9,14 @@ class Student:
         return db_connection.get_collection('students')
     
     @staticmethod
-    def create(name, email, roll_number=None, class_name=None):
+    def create(name, email, roll_number=None, class_name=None, teacher_id=None):
         """Create a new student"""
         student = {
             'name': name,
             'email': email,
             'roll_number': roll_number,
             'class': class_name,
+            'teacher_id': teacher_id,
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
         }
