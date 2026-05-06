@@ -15,12 +15,14 @@ from routes.auth_routes import auth_bp
 from routes.student_routes import student_bp
 from routes.evaluation_routes import evaluation_bp
 from utils.auth_helper import get_current_user_id
+from config import Config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# ✅ Register blueprints FIRST
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
 app.register_blueprint(student_bp, url_prefix="/api/students")
 app.register_blueprint(evaluation_bp, url_prefix="/api/evaluations")
@@ -31,7 +33,7 @@ cors_origins = [
     'http://localhost:5000',
     os.getenv('FRONTEND_URL', 'http://localhost:3000')
 ]
-CORS(app, origins=cors_origins)
+CORS(app, origins=cors_origins, supports_credentials=True)
 
 # Configuration
 app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
@@ -52,8 +54,38 @@ def serialize_doc(doc):
         doc = doc.copy()
         if '_id' in doc:
             doc['_id'] = str(doc['_id'])
+        # Convert roll_number to rollNumber for frontend consistency
+        if 'roll_number' in doc:
+            doc['rollNumber'] = doc['roll_number']
         return doc
     return doc
+
+
+# ==================== ROOT ROUTES ====================
+
+@app.route('/api/me', methods=['GET', 'OPTIONS'])
+def get_me():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        user = Teacher.find_by_id(user_id)
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        return jsonify({
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "subject": user.get("subject")
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/', methods=['GET'])
@@ -61,7 +93,12 @@ def root():
     return jsonify({
         'message': 'AI Examiner API',
         'version': '1.0',
-        'health_check': '/api/health'
+        'endpoints': {
+            'auth': '/api/auth',
+            'students': '/api/students',
+            'evaluations': '/api/evaluations',
+            'health': '/api/health'
+        }
     })
 
 
@@ -157,17 +194,19 @@ def create_student():
         data = request.json
         name = data.get('name')
         email = data.get('email')
-        roll_number = data.get('roll_number')
+        roll_number = data.get('rollNumber')  # 🔥 frontend consistency
         class_name = data.get('class')
 
-        if not name or not email:
-            return jsonify({'error': 'Name and email are required'}), 400
+        if not name or not roll_number:
+            return jsonify({'error': 'Name and roll number are required'}), 400
 
-        existing = Student.find_by_email(email) or Student.find_by_roll_number(roll_number) if roll_number else None
-        if existing:
+        existing_email = Student.find_by_email(email)
+        existing_roll = Student.find_by_roll_number(roll_number) if roll_number else None
+
+        if existing_email or existing_roll:
             return jsonify({'error': 'Roll No and Email must be unique'}), 400
 
-        student = Student.create(name, email, roll_number, class_name, teacher_id=user_id)  # ✅
+        student = Student.create(name, email, roll_number, class_name, teacher_id=user_id)
         return jsonify({
             'success': True,
             'student': serialize_doc(student)
@@ -180,19 +219,24 @@ def create_student():
 @app.route('/api/students', methods=['GET'])
 def get_all_students():
     try:
-        user_id = get_current_user_id()  # ✅
+        user_id = get_current_user_id()
+
+        print("Current User ID:", user_id)
+
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
 
-        students = Student.get_all(teacher_id=user_id)  # ✅ sirf apne students
+        students = Student.get_all(teacher_id=user_id)
+
         return jsonify({
             'success': True,
             'students': serialize_doc(students),
             'count': len(students)
         })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
+    except Exception as e:
+        logger.error(f"Error in /api/students: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/students/<student_id>', methods=['GET'])
 def get_student(student_id):
@@ -277,7 +321,7 @@ def evaluate_answer():
         if 'student_file' not in request.files:
             return jsonify({'error': 'No student file provided'}), 400
 
-        teacher_id = get_current_user_id()  # ✅ token se lo, form se nahi
+        teacher_id = get_current_user_id()
         if not teacher_id:
             return jsonify({'error': 'Unauthorized'}), 401
 
@@ -302,7 +346,7 @@ def evaluate_answer():
         student_name = 'Unknown'
         student_rollno = 'N/A'
 
-        teacher = Teacher.find_by_id(teacher_id)  # ✅ token wala id use karo
+        teacher = Teacher.find_by_id(teacher_id)
         if teacher:
             teacher_name = teacher.get('name', 'Unknown')
 
@@ -391,11 +435,11 @@ def bulk_evaluation():
 @app.route('/api/evaluations', methods=['GET'])
 def get_all_evaluations():
     try:
-        user_id = get_current_user_id()  # ✅
+        user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
 
-        evaluations = Evaluation.get_all(teacher_id=user_id)  # ✅ sirf apni evaluations
+        evaluations = Evaluation.get_all(teacher_id=user_id)
         if not evaluations:
             return jsonify([])
 
@@ -451,15 +495,15 @@ def get_student_evaluations(student_id):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/evaluations/teacher', methods=['GET'])  # ✅ URL se <teacher_id> hata di
+@app.route('/api/evaluations/teacher', methods=['GET'])
 def get_teacher_evaluations():
     try:
-        user_id = get_current_user_id()  # ✅ token se lo
+        user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
 
         limit = request.args.get('limit', 10, type=int)
-        evaluations = Evaluation.find_by_teacher(user_id, limit)  # ✅
+        evaluations = Evaluation.find_by_teacher(user_id, limit)
 
         return jsonify({
             'success': True,
