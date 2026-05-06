@@ -16,6 +16,8 @@ const Evaluate = ({ setLoading }) => {
 
   const [step, setStep] = useState(1);
   const [modelAnswerText, setModelAnswerText] = useState('');
+  const [modelAnswerFile, setModelAnswerFile] = useState(null);
+  const [isExtractingPdf, setIsExtractingPdf] = useState(false);
   const [studentFile, setStudentFile] = useState(null);
   const [maxMarks, setMaxMarks] = useState('');
   const [question, setQuestion] = useState('');
@@ -55,20 +57,35 @@ const Evaluate = ({ setLoading }) => {
     loadData();
   }, [loadData]);
 
+  // ✅ FIX 1: Model answer file upload — setStep(2) hata diya, sirf text extract karta hai
   const handleModelAnswerUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setError('');
+    setIsExtractingPdf(true);
     setLoading(true, 'Extracting model answer...');
 
     try {
       const response = await uploadModelAnswer(file);
-      setModelAnswerText(response.model_answer);
+
+      const text = response.model_answer || response.data?.model_answer || '';
+
+      if (!text.trim()) {
+        throw new Error("Could not extract text from PDF");
+      }
+
+      setModelAnswerText(text);
+      setModelAnswerFile(file.name);
+
+      // ✅ YAHAN MAGIC 🔥
       setStep(2);
+
     } catch (err) {
       setError(err.response?.data?.error || err.message);
+      setModelAnswerFile(null);
     } finally {
+      setIsExtractingPdf(false);
       setLoading(false);
     }
   };
@@ -136,7 +153,6 @@ const Evaluate = ({ setLoading }) => {
     }
   };
 
-  // Teacher name display — subject sirf tab show ho jab available ho
   const teacherDisplay = () => {
     if (!teacher) return 'Loading...';
     const subjectPart = teacher.subject ? ` (${teacher.subject})` : '';
@@ -168,7 +184,7 @@ const Evaluate = ({ setLoading }) => {
 
         {error && <div className="error-alert">{error}</div>}
 
-        {/* Step 1: Model Answer */}
+        {/* ✅ Step 1: Model Answer — FIXED */}
         {step === 1 && (
           <div className="step-content">
             <h2>Upload Model Answer</h2>
@@ -189,6 +205,21 @@ const Evaluate = ({ setLoading }) => {
               </label>
             </div>
 
+            {/* ✅ FIX 2: PDF upload hone ka confirmation */}
+            {modelAnswerFile && !isExtractingPdf && (
+              <div className="file-selected">
+                <FiCheckCircle color="green" />
+                <span>{modelAnswerFile}</span>
+              </div>
+            )}
+
+            {/* ✅ FIX 3: Extracting state indicator */}
+            {isExtractingPdf && (
+              <p style={{ color: '#888', fontSize: '14px', marginTop: '8px' }}>
+                ⏳ Extracting text from PDF...
+              </p>
+            )}
+
             <div className="form-group">
               <label>Or Paste Model Answer Text:</label>
               <textarea
@@ -200,10 +231,11 @@ const Evaluate = ({ setLoading }) => {
               ></textarea>
             </div>
 
+            {/* ✅ FIX 4: Button — isExtractingPdf ke dauran bhi disabled */}
             <button
               className="btn btn-primary btn-lg"
               onClick={() => setStep(2)}
-              disabled={!modelAnswerText}
+              disabled={!modelAnswerText || modelAnswerText.trim() === '' || isExtractingPdf}
             >
               Next <span>→</span>
             </button>
@@ -240,7 +272,6 @@ const Evaluate = ({ setLoading }) => {
                       </option>
                     ))}
                   </select>
-                  
                 </div>
               </div>
 
@@ -411,6 +442,7 @@ const Evaluate = ({ setLoading }) => {
                 onClick={() => {
                   setStep(1);
                   setModelAnswerText('');
+                  setModelAnswerFile(null);
                   setStudentFile(null);
                   setMaxMarks('');
                   setQuestion('');
