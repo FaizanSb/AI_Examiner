@@ -1,44 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiUploadCloud, FiCheckCircle } from 'react-icons/fi';
-import { uploadModelAnswer, evaluateAnswer, getAllTeachers, getAllStudents, createTeacher, createStudent } from '../services/api';
+import { uploadModelAnswer, evaluateAnswer, getAllStudents, createStudent } from '../services/api';
 import './Evaluate.css';
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('token')}`,
+});
 
 const Evaluate = ({ setLoading }) => {
   const navigate = useNavigate();
+
   const [step, setStep] = useState(1);
   const [modelAnswerText, setModelAnswerText] = useState('');
   const [studentFile, setStudentFile] = useState(null);
   const [maxMarks, setMaxMarks] = useState('');
   const [question, setQuestion] = useState('');
-  const [teachers, setTeachers] = useState([]);
+  const [teacher, setTeacher] = useState(null);
   const [students, setStudents] = useState([]);
-  const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [error, setError] = useState('');
   const [results, setResults] = useState(null);
 
-  const [showNewTeacher, setShowNewTeacher] = useState(false);
   const [showNewStudent, setShowNewStudent] = useState(false);
-  const [newTeacher, setNewTeacher] = useState({ name: '', email: '', subject: '' });
   const [newStudent, setNewStudent] = useState({ name: '', email: '', rollNumber: '', class: '' });
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  const fetchTeacher = useCallback(async () => {
     try {
-      const [teachersRes, studentsRes] = await Promise.all([
-        getAllTeachers(),
-        getAllStudents()
+      const res = await fetch(`${API}/api/me`, { headers: authHeaders() });
+      if (res.status === 401) { navigate('/'); return; }
+      const data = await res.json();
+      setTeacher(data);
+    } catch {
+      // silent fail
+    }
+  }, [navigate]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [studentsRes] = await Promise.all([
+        getAllStudents(),
+        fetchTeacher(),
       ]);
-      setTeachers(teachersRes.teachers || []);
       setStudents(studentsRes.students || []);
     } catch (err) {
-      console.error('Error loading users:', err);
+      console.error('Error loading data:', err);
     }
-  };
+  }, [fetchTeacher]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleModelAnswerUpload = async (e) => {
     const file = e.target.files[0];
@@ -58,29 +73,18 @@ const Evaluate = ({ setLoading }) => {
     }
   };
 
-  const handleAddTeacher = async () => {
-    if (!newTeacher.name || !newTeacher.email) {
-      setError('Name and email are required');
-      return;
-    }
-    try {
-      const response = await createTeacher(newTeacher.name, newTeacher.email, newTeacher.subject);
-      setTeachers([...teachers, response.teacher]);
-      setSelectedTeacher(response.teacher._id);
-      setShowNewTeacher(false);
-      setNewTeacher({ name: '', email: '', subject: '' });
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-    }
-  };
-
   const handleAddStudent = async () => {
     if (!newStudent.name || !newStudent.email) {
       setError('Name and email are required');
       return;
     }
     try {
-      const response = await createStudent(newStudent.name, newStudent.email, newStudent.rollNumber, newStudent.class);
+      const response = await createStudent(
+        newStudent.name,
+        newStudent.email,
+        newStudent.rollNumber,
+        newStudent.class
+      );
       setStudents([...students, response.student]);
       setSelectedStudent(response.student._id);
       setShowNewStudent(false);
@@ -97,10 +101,6 @@ const Evaluate = ({ setLoading }) => {
     }
     if (!maxMarks) {
       setError('Please enter maximum marks');
-      return;
-    }
-    if (!selectedTeacher) {
-      setError('Please select a teacher');
       return;
     }
     if (!selectedStudent) {
@@ -121,22 +121,26 @@ const Evaluate = ({ setLoading }) => {
       formData.append('model_answer', modelAnswerText);
       formData.append('max_marks', maxMarks);
       formData.append('question', question);
-      formData.append('teacher_id', selectedTeacher);
+      formData.append('teacher_id', teacher?._id);
       formData.append('student_id', selectedStudent);
 
       const response = await evaluateAnswer(formData);
-      // Extract evaluation from response
       const evaluationData = response.evaluation || response;
-      // Add max_marks to evaluation data for display
       evaluationData.max_marks = maxMarks;
       setResults(evaluationData);
-      // Navigate to results page with evaluation data
       navigate('/results/new', { state: { evaluation: evaluationData } });
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Teacher name display — subject sirf tab show ho jab available ho
+  const teacherDisplay = () => {
+    if (!teacher) return 'Loading...';
+    const subjectPart = teacher.subject ? ` (${teacher.subject})` : '';
+    return `${teacher.name}${subjectPart}`;
   };
 
   return (
@@ -169,7 +173,7 @@ const Evaluate = ({ setLoading }) => {
           <div className="step-content">
             <h2>Upload Model Answer</h2>
             <p className="step-description">Upload the correct answer PDF or type it in</p>
-            
+
             <div className="upload-area">
               <input
                 type="file"
@@ -212,63 +216,14 @@ const Evaluate = ({ setLoading }) => {
             <h2>Student Answer & Details</h2>
             <p className="step-description">Upload student answer and fill in the details</p>
 
-            {/* User Selection */}
+            {/* Teacher Info + Student Selection */}
             <div className="form-section">
               <h3>Teacher & Student</h3>
 
               <div className="form-group">
-                <label>Select Teacher *</label>
-                <div className="select-group">
-                  <select
-                    value={selectedTeacher}
-                    onChange={(e) => setSelectedTeacher(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">Choose a teacher...</option>
-                    {teachers.map(teacher => (
-                      <option key={teacher._id} value={teacher._id}>
-                        {teacher.name} ({teacher.subject})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className="btn-icon"
-                    onClick={() => setShowNewTeacher(!showNewTeacher)}
-                    title="Add new teacher"
-                  >
-                    +
-                  </button>
-                </div>
+                <label>Teacher</label>
+                <div className="teacherName">{teacherDisplay()}</div>
               </div>
-
-              {showNewTeacher && (
-                <div className="add-form">
-                  <input
-                    type="text"
-                    placeholder="Teacher name"
-                    value={newTeacher.name}
-                    onChange={(e) => setNewTeacher({...newTeacher, name: e.target.value})}
-                    className="form-input"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={newTeacher.email}
-                    onChange={(e) => setNewTeacher({...newTeacher, email: e.target.value})}
-                    className="form-input"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Subject"
-                    value={newTeacher.subject}
-                    onChange={(e) => setNewTeacher({...newTeacher, subject: e.target.value})}
-                    className="form-input"
-                  />
-                  <button className="btn btn-sm btn-primary" onClick={handleAddTeacher}>
-                    Add Teacher
-                  </button>
-                </div>
-              )}
 
               <div className="form-group">
                 <label>Select Student *</label>
@@ -301,28 +256,28 @@ const Evaluate = ({ setLoading }) => {
                     type="text"
                     placeholder="Student name"
                     value={newStudent.name}
-                    onChange={(e) => setNewStudent({...newStudent, name: e.target.value})}
+                    onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
                     className="form-input"
                   />
                   <input
                     type="email"
                     placeholder="Email"
                     value={newStudent.email}
-                    onChange={(e) => setNewStudent({...newStudent, email: e.target.value})}
+                    onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
                     className="form-input"
                   />
                   <input
                     type="text"
                     placeholder="Roll number"
                     value={newStudent.rollNumber}
-                    onChange={(e) => setNewStudent({...newStudent, rollNumber: e.target.value})}
+                    onChange={(e) => setNewStudent({ ...newStudent, rollNumber: e.target.value })}
                     className="form-input"
                   />
                   <input
                     type="text"
                     placeholder="Class"
                     value={newStudent.class}
-                    onChange={(e) => setNewStudent({...newStudent, class: e.target.value})}
+                    onChange={(e) => setNewStudent({ ...newStudent, class: e.target.value })}
                     className="form-input"
                   />
                   <button className="btn btn-sm btn-primary" onClick={handleAddStudent}>
