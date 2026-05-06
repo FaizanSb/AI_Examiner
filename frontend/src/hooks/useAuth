@@ -1,0 +1,40 @@
+import { useState, useEffect } from "react";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${localStorage.getItem("token")}`,
+});
+
+export const useAuth = () => {
+  const [teacher, setTeacher] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTeacher = async () => {
+    try {
+      const res = await fetch(`${API}/api/me`, {
+        headers: authHeaders(),
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        window.location.href = "/";
+        return;
+      }
+
+      const data = await res.json();
+      setTeacher(data);
+    } catch (err) {
+      console.error("Auth error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeacher();
+  }, []);
+
+  return { teacher, loading };
+};
