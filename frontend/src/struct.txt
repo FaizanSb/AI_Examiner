@@ -35,10 +35,12 @@ D:.
 ¦       Home.jsx
 ¦       home1.css
 ¦       login.jsx
+¦       Login.module.css
 ¦       Management.css
 ¦       Management.jsx
 ¦       Results.css
 ¦       Results.jsx
+¦       signUp.css
 ¦       Signup.jsx
 ¦       
 +---services

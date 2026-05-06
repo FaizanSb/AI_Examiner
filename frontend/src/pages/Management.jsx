@@ -1,315 +1,319 @@
 import React, { useState, useEffect } from 'react';
-import { FiTrash2, FiPlus } from 'react-icons/fi';
-import { getAllTeachers, createTeacher, getAllStudents, createStudent, deleteTeacher, deleteStudent } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { FiTrash2, FiPlus, FiX, FiUser, FiHash, FiMail, FiBook, FiAlertCircle, FiCheckCircle, FiSearch } from 'react-icons/fi';
 import './Management.css';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('token')}`,
+});
+
 const Management = ({ setLoading }) => {
-  const [activeTab, setActiveTab] = useState('teachers');
-  const [teachers, setTeachers] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [showAddTeacher, setShowAddTeacher] = useState(false);
-  const [showAddStudent, setShowAddStudent] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
-  const [newTeacher, setNewTeacher] = useState({ name: '', email: '', subject: '' });
-  const [newStudent, setNewStudent] = useState({ name: '', email: '', rollNumber: '', class: '' });
+  const [students, setStudents]         = useState([]);
+  const [showForm, setShowForm]         = useState(false);
+  const [error, setError]               = useState('');
+  const [success, setSuccess]           = useState('');
+  const [deletingId, setDeletingId]     = useState(null);
+  const [submitting, setSubmitting]     = useState(false);
+  const [searchQuery, setSearchQuery]   = useState('');
 
+  const [newStudent, setNewStudent] = useState({
+    name: '', email: '', rollNumber: '', class: ''
+  });
+
+  // ── Auth check + load ────────────────────────────────────
   useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const token = localStorage.getItem('token');
+    if (!token) { navigate('/'); return; }
+    loadStudents();
   }, []);
 
-  const loadData = async () => {
+  const loadStudents = async () => {
     try {
-      setLoading(true, 'Loading data...');
-      const [teachersRes, studentsRes] = await Promise.all([
-        getAllTeachers(),
-        getAllStudents()
-      ]);
-      setTeachers(teachersRes.teachers || []);
-      setStudents(studentsRes.students || []);
+      setLoading?.(true, 'Loading students...');
+      const res = await fetch(`${API}/api/students`, { headers: authHeaders() });
+
+      if (res.status === 401) { navigate('/'); return; }
+      if (!res.ok) throw new Error('Failed to fetch students');
+
+      const data = await res.json();
+      setStudents(Array.isArray(data) ? data : (data.students || []));
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setLoading?.(false);
     }
   };
 
-  const handleAddTeacher = async () => {
-    if (!newTeacher.name || !newTeacher.email) {
-      setError('Name and email are required');
-      return;
-    }
-
-    try {
-      setError('');
-      const response = await createTeacher(newTeacher.name, newTeacher.email, newTeacher.subject);
-      setTeachers([...teachers, response.teacher]);
-      setNewTeacher({ name: '', email: '', subject: '' });
-      setShowAddTeacher(false);
-      setSuccess('Teacher added successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-    }
+  // ── Helpers ──────────────────────────────────────────────
+  const showMsg = (type, msg) => {
+    if (type === 'success') { setSuccess(msg); setError(''); }
+    else                    { setError(msg);   setSuccess(''); }
+    setTimeout(() => { setSuccess(''); setError(''); }, 3500);
   };
 
+  const resetForm = () => {
+    setNewStudent({ name: '', email: '', rollNumber: '', class: '' });
+    setShowForm(false);
+  };
+
+  // ── Add Student ──────────────────────────────────────────
   const handleAddStudent = async () => {
-    if (!newStudent.name || !newStudent.email || !newStudent.rollNumber) {
-      setError('Name, email, and roll number are required');
+    if (!newStudent.name.trim() || !newStudent.rollNumber.trim()) {
+      showMsg('error', 'Name and Roll Number are required.');
       return;
     }
 
     try {
-      setError('');
-      const response = await createStudent(
-        newStudent.name,
-        newStudent.email,
-        newStudent.rollNumber,
-        newStudent.class
-      );
-      setStudents([...students, response.student]);
-      setNewStudent({ name: '', email: '', rollNumber: '', class: '' });
-      setShowAddStudent(false);
-      setSuccess('Student added successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      setSubmitting(true);
+      const res = await fetch(`${API}/api/students`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(newStudent),
+      });
+
+      if (res.status === 401) { navigate('/'); return; }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add student');
+
+      setStudents(prev => [...prev, data.student || data]);
+      resetForm();
+      showMsg('success', `${newStudent.name} added successfully!`);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      showMsg('error', err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDeleteTeacher = async (teacherId) => {
-    if (window.confirm('Are you sure you want to delete this teacher?')) {
-      try {
-        await deleteTeacher(teacherId);
-        setTeachers(teachers.filter(t => t._id !== teacherId));
-        setSuccess('Teacher deleted successfully!');
-        setTimeout(() => setSuccess(''), 3000);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to delete teacher');
+  // ── Delete Student ───────────────────────────────────────
+  const handleDelete = async (studentId, studentName) => {
+    if (!window.confirm(`Delete "${studentName}"? This cannot be undone.`)) return;
+
+    try {
+      setDeletingId(studentId);
+      const res = await fetch(`${API}/api/students/${studentId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+
+      if (res.status === 401) { navigate('/'); return; }
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete');
       }
+
+      setStudents(prev => prev.filter(s => s._id !== studentId));
+      showMsg('success', `${studentName} deleted.`);
+    } catch (err) {
+      showMsg('error', err.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  const handleDeleteStudent = async (studentId) => {
-    if (window.confirm('Are you sure you want to delete this student?')) {
-      try {
-        await deleteStudent(studentId);
-        setStudents(students.filter(s => s._id !== studentId));
-        setSuccess('Student deleted successfully!');
-        setTimeout(() => setSuccess(''), 3000);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to delete student');
-      }
-    }
-  };
+  // ── Filtered list ────────────────────────────────────────
+  const filtered = students.filter(s => {
+    const q = searchQuery.toLowerCase();
+    return (
+      s.name?.toLowerCase().includes(q) ||
+      s.rollNumber?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.class?.toLowerCase().includes(q)
+    );
+  });
 
+  // ── Render ───────────────────────────────────────────────
   return (
-    <div className="management">
-      <div className="management-container">
-        <h1 className="page-title">Manage Teachers & Students</h1>
+    <div className="mgmt-root">
+      <div className="mgmt-container">
 
-        {error && <div className="error-alert">{error}</div>}
-        {success && <div className="success-alert">{success}</div>}
-
-        {/* Tabs */}
-        <div className="tabs">
+        {/* ── Page Header ── */}
+        <div className="mgmt-page-header">
+          <div>
+            <h1 className="mgmt-title">Student Management</h1>
+            <p className="mgmt-subtitle">Add, view, and manage your students</p>
+          </div>
           <button
-            className={`tab-button ${activeTab === 'teachers' ? 'active' : ''}`}
-            onClick={() => setActiveTab('teachers')}
+            className="mgmt-add-btn"
+            onClick={() => { setShowForm(f => !f); setError(''); }}
           >
-            👨‍🏫 Teachers ({teachers.length})
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'students' ? 'active' : ''}`}
-            onClick={() => setActiveTab('students')}
-          >
-            👨‍🎓 Students ({students.length})
+            {showForm ? <><FiX size={16} /> Cancel</> : <><FiPlus size={16} /> Add Student</>}
           </button>
         </div>
 
-        {/* Teachers Tab */}
-        {activeTab === 'teachers' && (
-          <div className="tab-content">
-            <div className="section-header">
-              <h2>Teachers Management</h2>
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowAddTeacher(!showAddTeacher)}
-              >
-                <FiPlus /> Add Teacher
-              </button>
+        {/* ── Alerts ── */}
+        {error && (
+          <div className="mgmt-alert mgmt-alert-error">
+            <FiAlertCircle size={15} /> {error}
+          </div>
+        )}
+        {success && (
+          <div className="mgmt-alert mgmt-alert-success">
+            <FiCheckCircle size={15} /> {success}
+          </div>
+        )}
+
+        {/* ── Add Student Form ── */}
+        {showForm && (
+          <div className="mgmt-form-card">
+            <h3 className="mgmt-form-title">New Student</h3>
+            <div className="mgmt-form-grid">
+
+              <div className="mgmt-field">
+                <label><FiUser size={12} /> Full Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ali Hassan"
+                  value={newStudent.name}
+                  onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
+                  className="mgmt-input"
+                />
+              </div>
+
+              <div className="mgmt-field">
+                <label><FiHash size={12} /> Roll Number *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. GCUF-2021-CS-001"
+                  value={newStudent.rollNumber}
+                  onChange={e => setNewStudent({ ...newStudent, rollNumber: e.target.value })}
+                  className="mgmt-input"
+                />
+              </div>
+
+              <div className="mgmt-field">
+                <label><FiMail size={12} /> Email (optional)</label>
+                <input
+                  type="email"
+                  placeholder="student@gcuf.edu.pk"
+                  value={newStudent.email}
+                  onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
+                  className="mgmt-input"
+                />
+              </div>
+
+              <div className="mgmt-field">
+                <label><FiBook size={12} /> Class / Section (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. BSCS-7A"
+                  value={newStudent.class}
+                  onChange={e => setNewStudent({ ...newStudent, class: e.target.value })}
+                  className="mgmt-input"
+                />
+              </div>
             </div>
 
-            {/* Add Teacher Form */}
-            {showAddTeacher && (
-              <div className="add-form-container">
-                <div className="add-form">
-                  <h3>Add New Teacher</h3>
-                  <input
-                    type="text"
-                    placeholder="Teacher name"
-                    value={newTeacher.name}
-                    onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
-                    className="form-input"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={newTeacher.email}
-                    onChange={(e) => setNewTeacher({ ...newTeacher, email: e.target.value })}
-                    className="form-input"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Subject (optional)"
-                    value={newTeacher.subject}
-                    onChange={(e) => setNewTeacher({ ...newTeacher, subject: e.target.value })}
-                    className="form-input"
-                  />
-                  <div className="form-buttons">
-                    <button className="btn btn-primary" onClick={handleAddTeacher}>
-                      Add Teacher
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setShowAddTeacher(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Teachers List */}
-            <div className="list-container">
-              {teachers.length > 0 ? (
-                <div className="cards-grid">
-                  {teachers.map(teacher => (
-                    <div key={teacher._id} className="management-card">
-                      <div className="card-header">
-                        <div className="avatar">👨‍🏫</div>
-                        <div className="card-title">
-                          <h3>{teacher.name}</h3>
-                          <p className="subject">{teacher.subject || 'No subject'}</p>
-                        </div>
-                      </div>
-                      <p className="email">{teacher.email}</p>
-                      <button
-                        className="btn-delete"
-                        onClick={() => handleDeleteTeacher(teacher._id)}
-                        title="Delete teacher"
-                      >
-                        <FiTrash2 />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <p>No teachers added yet</p>
-                </div>
-              )}
+            <div className="mgmt-form-actions">
+              <button
+                className="mgmt-btn-primary"
+                onClick={handleAddStudent}
+                disabled={submitting}
+              >
+                {submitting ? 'Adding…' : 'Add Student'}
+              </button>
+              <button className="mgmt-btn-ghost" onClick={resetForm}>
+                Cancel
+              </button>
             </div>
           </div>
         )}
 
-        {/* Students Tab */}
-        {activeTab === 'students' && (
-          <div className="tab-content">
-            <div className="section-header">
-              <h2>Students Management</h2>
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowAddStudent(!showAddStudent)}
-              >
-                <FiPlus /> Add Student
-              </button>
-            </div>
+        {/* ── Search + Count Bar ── */}
+        <div className="mgmt-toolbar">
+          <div className="mgmt-search-wrap">
+            <FiSearch size={15} className="mgmt-search-icon" />
+            <input
+              type="text"
+              placeholder="Search by name, roll no, class…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="mgmt-search-input"
+            />
+          </div>
+          <span className="mgmt-count">
+            {filtered.length} / {students.length} students
+          </span>
+        </div>
 
-            {/* Add Student Form */}
-            {showAddStudent && (
-              <div className="add-form-container">
-                <div className="add-form">
-                  <h3>Add New Student</h3>
-                  <input
-                    type="text"
-                    placeholder="Student name"
-                    value={newStudent.name}
-                    onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                    className="form-input"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={newStudent.email}
-                    onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
-                    className="form-input"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Roll number"
-                    value={newStudent.rollNumber}
-                    onChange={(e) => setNewStudent({ ...newStudent, rollNumber: e.target.value })}
-                    className="form-input"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Class (optional)"
-                    value={newStudent.class}
-                    onChange={(e) => setNewStudent({ ...newStudent, class: e.target.value })}
-                    className="form-input"
-                  />
-                  <div className="form-buttons">
-                    <button className="btn btn-primary" onClick={handleAddStudent}>
-                      Add Student
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setShowAddStudent(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
+        {/* ── Students List ── */}
+        {filtered.length === 0 ? (
+          <div className="mgmt-empty">
+            {students.length === 0 ? (
+              <>
+                <div className="mgmt-empty-icon">👨‍🎓</div>
+                <p>No students yet.</p>
+                <span>Click "Add Student" to get started.</span>
+              </>
+            ) : (
+              <>
+                <div className="mgmt-empty-icon">🔍</div>
+                <p>No results for "{searchQuery}"</p>
+              </>
             )}
+          </div>
+        ) : (
+          <div className="mgmt-table-wrap">
+            <table className="mgmt-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student</th>
+                  <th>Roll No.</th>
+                  <th>Class</th>
+                  <th>Email</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s, i) => (
+                  <tr key={s._id} className={deletingId === s._id ? 'row-deleting' : ''}>
+                    <td className="mgmt-td-num">{i + 1}</td>
 
-            {/* Students List */}
-            <div className="list-container">
-              {students.length > 0 ? (
-                <div className="cards-grid">
-                  {students.map(student => (
-                    <div key={student._id} className="management-card">
-                      <div className="card-header">
-                        <div className="avatar">👨‍🎓</div>
-                        <div className="card-title">
-                          <h3>{student.name}</h3>
-                          <p className="roll-number">{student.rollNumber}</p>
-                        </div>
+                    <td className="mgmt-td-name">
+                      <div className="mgmt-avatar">
+                        {s.name?.[0]?.toUpperCase() || '?'}
                       </div>
-                      <p className="email">{student.email}</p>
-                      {student.class && <p className="class">{student.class}</p>}
+                      <span>{s.name}</span>
+                    </td>
+
+                    <td>
+                      <span className="mgmt-roll-badge">{s.rollNumber || '—'}</span>
+                    </td>
+
+                    <td className="mgmt-td-muted">
+                      {s.class || <span className="mgmt-dash">—</span>}
+                    </td>
+
+                    <td className="mgmt-td-muted">
+                      {s.email || <span className="mgmt-dash">—</span>}
+                    </td>
+
+                    <td>
                       <button
-                        className="btn-delete"
-                        onClick={() => handleDeleteStudent(student._id)}
+                        className="mgmt-delete-btn"
+                        onClick={() => handleDelete(s._id, s.name)}
+                        disabled={deletingId === s._id}
                         title="Delete student"
                       >
-                        <FiTrash2 />
+                        {deletingId === s._id
+                          ? <span className="mgmt-deleting-dot" />
+                          : <FiTrash2 size={14} />
+                        }
                       </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <p>No students added yet</p>
-                </div>
-              )}
-            </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
+
       </div>
     </div>
   );
