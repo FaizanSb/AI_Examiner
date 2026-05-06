@@ -240,13 +240,7 @@ const Evaluate = ({ setLoading }) => {
                       </option>
                     ))}
                   </select>
-                  <button
-                    className="btn-icon"
-                    onClick={() => setShowNewStudent(!showNewStudent)}
-                    title="Add new student"
-                  >
-                    +
-                  </button>
+                  
                 </div>
               </div>
 
