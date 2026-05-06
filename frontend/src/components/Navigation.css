@@ -131,7 +131,7 @@
   transform: rotate(180deg);
 }
 
-/* ── Dropdown ── */
+/* ── Eval Dropdown ── */
 .eval-item {
   position: relative;
 }
@@ -228,6 +228,115 @@
   letter-spacing: 0.05em;
 }
 
+/* ── Profile Trigger ── */
+.profile-item {
+  position: relative;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.profile-trigger:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.profile-chevron {
+  transition: transform 0.25s ease;
+  opacity: 0.6;
+}
+
+.profile-chevron.open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+/* ── Profile Dropdown ── */
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: rgba(10, 15, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  min-width: 220px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  overflow: hidden;
+  animation: profileDDIn 0.18s ease;
+  backdrop-filter: blur(12px);
+}
+
+@keyframes profileDDIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.profile-header {
+  padding: 14px 16px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.profile-email {
+  font-size: 11px;
+  font-weight: 400;
+  color: #5a6a8a;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-item-btn {
+  width: 100%;
+  padding: 11px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #c8d3ec;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-item-btn:last-child {
+  border-bottom: none;
+}
+
+.profile-item-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.profile-item-btn.logout {
+  color: #f87171;
+}
+
+.profile-item-btn.logout:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+}
+
 /* ── Mobile ── */
 .mobile-menu-toggle {
   display: none;
@@ -258,7 +367,7 @@
   }
 
   .nav-menu.active {
-    max-height: 400px; /* thoda zyada — eval ke 2 links fit hon */
+    max-height: 500px;
   }
 
   .nav-item {
@@ -284,32 +393,49 @@
   /* Hide desktop eval button on mobile */
   .eval-desktop-btn { display: none; }
 
-  /* Show mobile links */
+  /* Show mobile eval links */
   .eval-mobile-links {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
-  .eval-mobile-links a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
 
-  .eval-mobile-single {
+  .eval-mobile-links a {
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    transition: color 0.2s;
   }
+
+  .eval-mobile-links a:hover { color: #fff; }
 
   .eval-mobile-batch {
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--text-secondary);
-    padding: 0.4rem 0;
-    font-size: 0.9rem;
-    margin-left: 6px;
   }
 
-  .eval-mobile-batch:hover { color: #fff; }
+  /* Mobile profile dropdown — static, no absolute */
+  .profile-item {
+    position: static;
+  }
+
+  .profile-trigger {
+    padding: 0;
+    background: transparent;
+  }
+
+  .profile-dropdown {
+    position: static;
+    margin-top: 0.75rem;
+    border-radius: 8px;
+    box-shadow: none;
+    animation: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }
