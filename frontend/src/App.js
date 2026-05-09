@@ -11,6 +11,7 @@ import EvaluationHistory from './pages/EvaluationHistory';
 import ProtectedRoute from './utils/ProtectedRoute'; // ✅ added
 import Login from './pages/login';    // 👈 add karo
 import Signup from './pages/Signup';  // 👈 add karo
+import Setting from './components/setting.jsx'; // 👈 add karo
 import './App.css';
 
 function App() {
@@ -58,7 +59,11 @@ function App() {
           } />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/settings" element={
+            <ProtectedRoute><Setting /></ProtectedRoute>
+          } />
         </Routes>
+
       </div>
     </Router>
   );

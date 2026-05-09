@@ -346,7 +346,7 @@ const Navigation = () => {
 
                   <button
                     className="profile-item-btn"
-                    onClick={() => navigate('/setting')}
+                    onClick={() => navigate('/settings')}
                   >
                     Settings ⚙️
                   </button>
