@@ -9,6 +9,7 @@ from models.student import Student
 from models.evaluation import Evaluation
 from bson import ObjectId
 from utils.bulk_processor import process_bulk_pdf
+from werkzeug.security import generate_password_hash
 import os
 import logging
 from routes.auth_routes import auth_bp
@@ -181,6 +182,90 @@ def delete_teacher(teacher_id):
         logger.error(f"Error deleting teacher: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+ # Updating teacher details is not allowed to prevent complications with authentication and data integrity. If needed, this can be implemented in the future with proper validation and security measures.
+ 
+@app.route('/api/update-profile', methods=['PUT'])
+def update_profile():
+
+    try:
+
+        # current logged in user
+        user_id = get_current_user_id()
+
+        data = request.json
+
+        name = data.get("name")
+        email = data.get("email")
+        password = data.get("password")
+        subject = data.get("subject")
+
+        teachers = db_connection.get_collection("teachers")
+
+        # =========================
+        # CHECK EMAIL EXISTS
+        # =========================
+        existing_email = teachers.find_one({
+            "email": email,
+            "_id": {"$ne": ObjectId(user_id)}
+        })
+
+        if existing_email:
+
+            return jsonify({
+                "success": False,
+                "message": "Email already exists"
+            }), 400
+
+
+        # =========================
+        # CHECK NAME EXISTS
+        # =========================
+        existing_name = teachers.find_one({
+            "name": name,
+            "_id": {"$ne": ObjectId(user_id)}
+        })
+
+        if existing_name:
+
+            return jsonify({
+                "success": False,
+                "message": "Username already exists"
+            }), 400
+
+
+        # =========================
+        # UPDATE DATA
+        # =========================
+        update_data = {
+            "name": name,
+            "email": email,
+            "subject": subject
+        }
+
+        # password optional
+        if password:
+
+            update_data["password"] = generate_password_hash(
+                password
+            )
+
+        teachers.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": update_data}
+        )
+
+        return jsonify({
+            "success": True,
+            "message": "Profile updated successfully"
+        }), 200
+
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 # ==================== STUDENT ROUTES ====================
 
