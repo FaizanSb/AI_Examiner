@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiArrowRight, FiCheckCircle, FiZap, FiBarChart2, FiUser } from 'react-icons/fi';
+import { FiArrowRight, FiCheckCircle, FiZap, FiBarChart2, FiUser, FiLogOut } from 'react-icons/fi';
 import './Home.css';
 import Login from './login';
 import Signup from './Signup';
@@ -9,7 +9,6 @@ const Home = () => {
   const [showSignup, setShowSignup] = useState(false);
   const [user, setUser] = useState(null);
 
-  // Fixed useEffect - reads user from localStorage properly
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -20,12 +19,17 @@ const Home = () => {
         setUser(null);
       }
     }
-  }, []); // Empty dependency array - runs only once on mount
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    setUser(null);
+  };
 
   return (
     <div className="home">
-      {showLogin && <Login onClose={() => setShowLogin(false)} />}
-      {showSignup && <Signup onClose={() => setShowSignup(false)} />}
+      {showLogin && <Login onClose={() => setShowLogin(false)} onLogin={(userData) => setUser(userData)} />}
+      {showSignup && <Signup onClose={() => setShowSignup(false)} onSignup={(userData) => setUser(userData)} />}
 
       {/* Hero Section */}
       <section className="hero">
@@ -46,20 +50,20 @@ const Home = () => {
             Automatically evaluate student answers using advanced AI technology.
             Save time, improve consistency, and get detailed feedback.
           </p>
-          {!user && (
+
+          {!user ? (
             <div className="hero-buttons">
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={() => setShowSignup(true)}
-              >
+              <button className="btn btn-primary btn-lg" onClick={() => setShowSignup(true)}>
                 Get Started <FiArrowRight />
               </button>
-
-              <button
-                className="btn btn-secondary btn-lg"
-                onClick={() => setShowLogin(true)}
-              >
+              <button className="btn btn-secondary btn-lg" onClick={() => setShowLogin(true)}>
                 Login <FiUser />
+              </button>
+            </div>
+          ) : (
+            <div className="hero-buttons">
+              <button className="btn btn-danger btn-lg" onClick={handleLogout}>
+                Logout <FiLogOut />
               </button>
             </div>
           )}
@@ -143,21 +147,28 @@ const Home = () => {
         <div className="cta-content">
           <h2>Ready to Transform Your Grading Process?</h2>
           <p>Join educators worldwide who are saving time and improving student outcomes</p>
-          <button
-            className="btn btn-primary btn-lg btn-cta"
-            onClick={() => setShowSignup(true)}
-          >
-            Get Started Now
-          </button>
-          <p>
-            Already have an account?{" "}
-            <span
-              style={{ color: "#93c5fd", cursor: "pointer", fontWeight: 600 }}
-              onClick={() => setShowLogin(true)}
-            >
-              Login
-            </span>
-          </p>
+
+          {!user ? (
+            <>
+              <button className="btn btn-primary btn-lg btn-cta" onClick={() => setShowSignup(true)}>
+                Get Started Now
+              </button>
+              <p>
+                Already have an account?{" "}
+                <span
+                  style={{ color: "#93c5fd", cursor: "pointer", fontWeight: 600 }}
+                  onClick={() => setShowLogin(true)}
+                >
+                  Login
+                </span>
+              </p>
+            </>
+          ) : (
+            <button className="btn btn-danger btn-lg btn-cta" onClick={handleLogout}>
+              Logout <FiLogOut />
+            </button>
+          )}
+
           <p className="cta-note">Copyright © 2026 AI Examiner. All rights reserved.</p>
         </div>
       </section>
