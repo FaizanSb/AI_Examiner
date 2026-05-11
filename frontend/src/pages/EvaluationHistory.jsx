@@ -575,7 +575,7 @@ function EvaluationHistory() {
                 <div className="results-grid">
                   <div className="result-card">
                     <div className="result-label">Marks Obtained</div>
-                    <div className="result-value">{selectedEvaluation.marks || '0'}</div>
+                    <div className="result-value">{selectedEvaluation.marks_awarded || '0'}</div>
                   </div>
                   <div className="result-card">
                     <div className="result-label">Grade</div>
