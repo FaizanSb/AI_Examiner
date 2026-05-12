@@ -486,119 +486,130 @@ def evaluate_answer():
 @app.route('/api/evaluate/bulk', methods=['POST'])
 def bulk_evaluation():
     try:
-        # =========================================
-        # STEP 1 → PDF Upload + Student Extraction
-        # =========================================
-        if 'file' in request.files:
-            pdf = request.files['file']
-            
-            # Validate file type
-            if not Config.allowed_file(pdf.filename):
-                return jsonify({
-                    "success": False,
-                    "message": "Invalid file type. Only PDF allowed."
-                }), 400
-            
-            pdf_path = pdf_processor.save_uploaded_file(
-                pdf,
-                app.config['UPLOAD_FOLDER']
-            )
-            
-            result = process_bulk_pdf(
-                pdf_path,
-                None,
-                None,
-                gemini_service
-            )
-            
-            # Clean up uploaded file
-            os.remove(pdf_path)
-            
-            return jsonify({
-                "success": True,
-                "students": result,
-                "count": len(result)
-            })
-        
-        # =========================================
-        # STEP 2 → AI Evaluation
-        # =========================================
-        elif request.is_json:
-            data = request.get_json()
-            
-            students = data.get('students', [])
-            model_answer = data.get('model_answer', '')
-            total_marks = data.get('total_marks', 10)
-            subject = data.get('subject', '')
-            
-            if not students:
-                return jsonify({
-                    "success": False,
-                    "message": "No students provided"
-                }), 400
-            
-            if not model_answer:
-                return jsonify({
-                    "success": False,
-                    "message": "Model answer is required"
-                }), 400
-            
-            # Get current teacher info
-            teacher_id = get_current_user_id()
-            teacher_name = 'Unknown'
-            if teacher_id:
-                teacher = Teacher.find_by_id(teacher_id)
-                if teacher:
-                    teacher_name = teacher.get('name', 'Unknown')
-            
-            # Perform bulk evaluation
-            evaluations = gemini_service.evaluate_bulk_students(
-                students=students,
-                model_answer=model_answer,
-                total_marks=total_marks,
-                subject=subject
-            )
-            
-            # Save evaluations to database
-            saved_evaluations = []
-            for evaluation in evaluations:
-                eval_doc = Evaluation.create(
-                    teacher_id=teacher_id,
-                    student_id=evaluation.get('student_id'),
-                    question=subject,
-                    model_answer=model_answer,
-                    student_answer=evaluation.get('answer', ''),
-                    extracted_text=evaluation.get('answer', ''),
-                    max_marks=total_marks,
-                    evaluation_result={
-                        'marks_obtained': evaluation.get('marks_obtained', 0),
-                        'percentage': evaluation.get('percentage', 0),
-                        'feedback': evaluation.get('feedback', ''),
-                        'strengths': evaluation.get('strengths', []),
-                        'weaknesses': evaluation.get('weaknesses', [])
-                    },
-                    teacher_name=teacher_name,
-                    student_name=evaluation.get('student_name', 'Unknown'),
-                    student_rollno=evaluation.get('roll_number', 'N/A')
-                )
-                evaluation['evaluation_id'] = str(eval_doc['_id'])
-                saved_evaluations.append(evaluation)
-            
-            return jsonify({
-                "success": True,
-                "results": saved_evaluations,
-                "count": len(saved_evaluations)
-            })
-        
-        # =========================================
-        # INVALID REQUEST
-        # =========================================
-        else:
+        # Single FormData request: file + model_answer + total_marks
+        if 'file' not in request.files:
             return jsonify({
                 "success": False,
-                "message": "Invalid request type. Expected multipart/form-data with PDF file or JSON data."
+                "message": "PDF file required"
             }), 400
-    
+
+        pdf = request.files['file']
+
+        if not Config.allowed_file(pdf.filename):
+            return jsonify({
+                "success": False,
+                "message": "Invalid file type. Only PDF allowed."
+            }), 400
+
+        model_answer = request.form.get('model_answer', '')
+        total_marks = request.form.get('total_marks', 10)
+
+        if not model_answer:
+            return jsonify({
+                "success": False,
+                "message": "Model answer is required"
+            }), 400
+
+        try:
+            total_marks = int(total_marks)
+        except (ValueError, TypeError):
+            total_marks = 10
+
+        # Get teacher info
+        teacher_id = get_current_user_id()
+        teacher_name = 'Unknown'
+        subject = ''
+        if teacher_id:
+            teacher = Teacher.find_by_id(teacher_id)
+            if teacher:
+                teacher_name = teacher.get('name', 'Unknown')
+                subject = teacher.get('subject', '')
+
+        # Save PDF temporarily
+        pdf_path = pdf_processor.save_uploaded_file(
+            pdf,
+            app.config['UPLOAD_FOLDER']
+        )
+
+        try:
+            # Process PDF → Extract + Evaluate in one shot
+            results = process_bulk_pdf(
+                pdf_path,
+                model_answer,
+                total_marks,
+                gemini_service
+            )
+        finally:
+            # Always clean up
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+
+        if not results:
+            return jsonify({
+                "success": False,
+                "message": "Could not extract student data from PDF"
+            }), 400
+
+        # Save to DB + format response
+        saved_results = []
+        for s in results:
+            obtained = s.get('obtained_marks', 0)
+            percentage = round((obtained / total_marks) * 100, 1) if total_marks else 0
+
+            # Check if student exists in DB
+            roll_no = str(s.get('roll_no', ''))
+            student_name = s.get('name', 'Unknown')
+            status = 'new'
+
+            # Try to find existing student
+            existing_student = Student.find_by_roll_number(roll_no) if roll_no else None
+            if existing_student:
+                status = 'found'
+                student_name = existing_student.get('name', student_name)
+
+            # Save evaluation to DB
+            try:
+                eval_doc = Evaluation.create(
+                    teacher_id=teacher_id,
+                    student_id=existing_student.get('_id') if existing_student else None,
+                    question=subject,
+                    model_answer=model_answer,
+                    student_answer=s.get('answer', ''),
+                    extracted_text=s.get('answer', ''),
+                    max_marks=total_marks,
+                    evaluation_result={
+                        'marks_obtained': obtained,
+                        'percentage': percentage,
+                        'feedback': s.get('remarks', ''),
+                        'strengths': [],
+                        'weaknesses': []
+                    },
+                    teacher_name=teacher_name,
+                    student_name=student_name,
+                    student_rollno=roll_no
+                )
+                eval_id = str(eval_doc['_id'])
+            except Exception as db_err:
+                logger.warning(f"DB save failed for {student_name}: {db_err}")
+                eval_id = None
+
+            saved_results.append({
+                "name": student_name,
+                "roll_no": roll_no,
+                "obtained_marks": obtained,
+                "total_marks": total_marks,
+                "percentage": percentage,
+                "remarks": s.get('remarks', ''),
+                "status": status,
+                "evaluation_id": eval_id
+            })
+
+        return jsonify({
+            "success": True,
+            "results": saved_results,
+            "count": len(saved_results)
+        })
+
     except Exception as e:
         logger.error(f"Bulk evaluation error: {str(e)}")
         return jsonify({
