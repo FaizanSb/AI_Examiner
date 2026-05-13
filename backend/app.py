@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import Config
@@ -45,6 +47,7 @@ pdf_processor = PDFProcessor()
 gemini_service = GeminiService(Config.GEMINI_API_KEY)
 
 
+# NAYA — yeh lagao
 def serialize_doc(doc):
     """Convert MongoDB document to JSON serializable format"""
     if doc is None:
@@ -52,13 +55,17 @@ def serialize_doc(doc):
     if isinstance(doc, list):
         return [serialize_doc(item) for item in doc]
     if isinstance(doc, dict):
-        doc = doc.copy()
-        if '_id' in doc:
-            doc['_id'] = str(doc['_id'])
-        # Convert roll_number to rollNumber for frontend consistency
-        if 'roll_number' in doc:
-            doc['rollNumber'] = doc['roll_number']
-        return doc
+        result = {}
+        for k, v in doc.items():
+            result[k] = serialize_doc(v)
+        # Frontend consistency
+        if 'roll_number' in result:
+            result['rollNumber'] = result['roll_number']
+        return result
+    if isinstance(doc, ObjectId):
+        return str(doc)
+    if isinstance(doc, datetime):
+        return doc.isoformat()
     return doc
 
 
@@ -306,7 +313,7 @@ def get_all_students():
     try:
         user_id = get_current_user_id()
 
-        print("Current User ID:", user_id)
+        #print("Current User ID:", user_id)
 
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
@@ -483,6 +490,15 @@ def evaluate_answer():
         return jsonify({'error': str(e)}), 500
 
 
+def _calculate_grade(percentage):
+    if percentage >= 90: return 'A+'
+    if percentage >= 80: return 'A'
+    if percentage >= 70: return 'B+'
+    if percentage >= 60: return 'B'
+    if percentage >= 50: return 'C'
+    if percentage >= 40: return 'D'
+    return 'F'
+
 @app.route('/api/evaluate/bulk', methods=['POST'])
 def bulk_evaluation():
     try:
@@ -502,7 +518,7 @@ def bulk_evaluation():
             }), 400
 
         model_answer = request.form.get('model_answer', '')
-        total_marks = request.form.get('total_marks', 10)
+        total_marks = request.form.get('total_marks', )
 
         if not model_answer:
             return jsonify({
@@ -550,39 +566,41 @@ def bulk_evaluation():
                 "message": "Could not extract student data from PDF"
             }), 400
 
+        # NAYA — ye lagao
         # Save to DB + format response
         saved_results = []
         for s in results:
-            obtained = s.get('obtained_marks', 0)
-            percentage = round((obtained / total_marks) * 100, 1) if total_marks else 0
 
-            # Check if student exists in DB
+            # ✅ bulk_processor ab marks_awarded return karta hai
+            obtained = s.get('marks_awarded', 0)
+            percentage = s.get('percentage', round((obtained / total_marks) * 100, 1) if total_marks else 0)
+            grade = s.get('grade', _calculate_grade(percentage))
+
             roll_no = str(s.get('roll_no', ''))
             student_name = s.get('name', 'Unknown')
             status = 'new'
 
-            # Try to find existing student
             existing_student = Student.find_by_roll_number(roll_no) if roll_no else None
             if existing_student:
                 status = 'found'
                 student_name = existing_student.get('name', student_name)
 
-            # Save evaluation to DB
             try:
                 eval_doc = Evaluation.create(
-                    teacher_id=teacher_id,
-                    student_id=existing_student.get('_id') if existing_student else None,
+                    teacher_id=str(teacher_id),
+                    student_id=str(existing_student.get('_id')) if existing_student else None,
                     question=subject,
                     model_answer=model_answer,
                     student_answer=s.get('answer', ''),
                     extracted_text=s.get('answer', ''),
                     max_marks=total_marks,
                     evaluation_result={
-                        'marks_obtained': obtained,
+                        'marks_awarded': obtained,
                         'percentage': percentage,
-                        'feedback': s.get('remarks', ''),
-                        'strengths': [],
-                        'weaknesses': []
+                        'grade': grade,
+                        'feedback': s.get('feedback', ''),
+                        'strengths': s.get('strengths', []),
+                        'missing_points': s.get('missing_points', [])
                     },
                     teacher_name=teacher_name,
                     student_name=student_name,
@@ -599,14 +617,15 @@ def bulk_evaluation():
                 "obtained_marks": obtained,
                 "total_marks": total_marks,
                 "percentage": percentage,
-                "remarks": s.get('remarks', ''),
+                "grade": grade,
+                "remarks": s.get('feedback', ''),
                 "status": status,
                 "evaluation_id": eval_id
             })
 
         return jsonify({
             "success": True,
-            "results": saved_results,
+            "results": serialize_doc(saved_results),
             "count": len(saved_results)
         })
 

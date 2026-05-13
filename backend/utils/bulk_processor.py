@@ -1,62 +1,110 @@
 from utils.pdf_processor import PDFProcessor
 
 def process_bulk_pdf(pdf_path, teacher_answer, total_marks, gemini_service):
-    """
-    BULK PROCESSOR (HANDWRITTEN SUPPORT)
-    PDF → Images → Gemini → Extract + Evaluate → JSON
-    """
     try:
-        # Convert PDF to images
         images = PDFProcessor.convert_pdf_to_images(pdf_path, max_pages=50)
 
         if not images:
             return []
 
-        prompt = f"""
-You are an expert examiner.
+        # CALL 1: Extract only
+        extract_prompt = """
+You are a data extractor. This PDF has multiple handwritten student answer sheets.
 
-This PDF contains MULTIPLE handwritten student answer sheets.
+YOUR ONLY JOB: Extract student info and their written answers. DO NOT evaluate. DO NOT give marks.
 
-TASK:
-1. Extract all students from the PDF
-2. For each student extract:
-   - name (student ka naam)
-   - roll_no (roll number, MANDATORY)
-   - their written answer
-   - evaluate their answer vs the MODEL ANSWER below
+For each student extract:
+- name: their name written on sheet
+- roll_no: their roll number
+- answer: their complete written answer word for word
 
-3. Award marks out of {total_marks}
-4. Be strict but fair
-
-MODEL ANSWER:
-{teacher_answer}
-
-RETURN ONLY A VALID JSON ARRAY (no explanation, no markdown, just raw JSON):
-
+RETURN ONLY RAW JSON ARRAY (no markdown):
 [
-  {{
+  {
     "name": "Student Name",
     "roll_no": "Roll Number",
-    "obtained_marks": 0,
-    "remarks": "Brief feedback"
-  }}
+    "answer": "Complete answer exactly as student wrote it"
+  }
 ]
 """
-
-        print("🔥 BULK PROCESS START")
-        print("Images:", len(images))
-        print("Total Marks:", total_marks)
-
-        contents = [prompt, *images]
+        print("🔥 STEP 1: Extracting students...")
+        contents = [extract_prompt, *images]
         response = gemini_service.model.generate_content(contents)
+        print("Extraction Response:", response.text)
 
-        print("🔥 GEMINI RESPONSE:")
-        print(response.text)
+        students = gemini_service._parse_json(response.text)
+        if not students:
+            return []
 
-        result = gemini_service._parse_json(response.text)
+        print(f"✅ Extracted {len(students)} students")
 
-        return result if result else []
+        # CALL 2: Evaluate each student individually
+        results = []
+
+        for student in students:
+            eval_prompt = f"""
+You are a strict examiner. Evaluate ONLY based on the MODEL ANSWER below.
+
+TOTAL MARKS: {total_marks}
+
+MODEL ANSWER (compare strictly against this only):
+{teacher_answer}
+
+STUDENT NAME: {student.get('name')}
+STUDENT ROLL NO: {student.get('roll_no')}
+
+STUDENT ANSWER:
+{student.get('answer', 'No answer written')}
+
+RULES:
+- Give marks ONLY for content matching the MODEL ANSWER
+- Content not in model answer = no marks
+- Be strict but fair
+
+RETURN ONLY RAW JSON (single object, no markdown):
+{{
+  "name": "{student.get('name')}",
+  "roll_no": "{student.get('roll_no')}",
+  "answer": "{student.get('answer', '')}",
+  "marks_awarded": 0,
+  "percentage": 0,
+  "grade": "F",
+  "feedback": "detailed feedback comparing to model answer",
+  "strengths": ["strength 1", "strength 2"],
+  "missing_points": ["missing point 1", "missing point 2"]
+}}
+"""
+            print(f"🔥 Evaluating: {student.get('name')}...")
+            eval_response = gemini_service.model.generate_content(eval_prompt)
+            print(f"Eval Response:", eval_response.text)
+
+            evaluated = gemini_service._parse_json(eval_response.text)
+
+            if evaluated:
+                if isinstance(evaluated, list):
+                    evaluated = evaluated[0]
+                
+                # percentage aur grade calculate karo agar Gemini ne galat diya
+                marks = evaluated.get('marks_awarded', 0)
+                pct = round((marks / total_marks) * 100, 1) if total_marks else 0
+                evaluated['percentage'] = pct
+                evaluated['grade'] = _calculate_grade(pct)
+                
+                results.append(evaluated)
+
+        print(f"✅ Evaluated {len(results)} students")
+        return results
 
     except Exception as e:
         print("❌ Bulk Processing Error:", e)
         return []
+
+
+def _calculate_grade(percentage):
+    if percentage >= 90: return 'A+'
+    if percentage >= 80: return 'A'
+    if percentage >= 70: return 'B+'
+    if percentage >= 60: return 'B'
+    if percentage >= 50: return 'C'
+    if percentage >= 40: return 'D'
+    return 'F'
