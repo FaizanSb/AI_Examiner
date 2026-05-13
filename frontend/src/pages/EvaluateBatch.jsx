@@ -339,6 +339,8 @@ const EvaluateBatch = ({ setLoading }) => {
 
     // ── Header rows ──────────────────────────────
     const headerRows = [
+      // Logo can be added here if needed, but for now we just have text headers
+      
       ['Government College University Faisalabad (GCUF)'],
       ['Department of Computer Science'],
       [''],
