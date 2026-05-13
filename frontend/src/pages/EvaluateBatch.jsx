@@ -5,6 +5,7 @@ import {
   FiCheckCircle,
   FiEdit2,
 } from 'react-icons/fi';
+import * as XLSX from 'xlsx';
 
 import './EvaluateBatch.css';
 
@@ -319,16 +320,75 @@ const EvaluateBatch = ({ setLoading }) => {
   const classAverage =
     results.length > 0
       ? (
-          results.reduce(
-            (sum, r) =>
-              sum +
-              Number(
-                r.obtained_marks || 0
-              ),
-            0
-          ) / results.length
-        ).toFixed(1)
+        results.reduce(
+          (sum, r) =>
+            sum +
+            Number(
+              r.obtained_marks || 0
+            ),
+          0
+        ) / results.length
+      ).toFixed(1)
       : 0;
+
+  // =========================
+  // EXPORT RESULTS
+  // =========================
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // ── Header rows ──────────────────────────────
+    const headerRows = [
+      ['Government College University Faisalabad (GCUF)'],
+      ['Department of Computer Science'],
+      [''],
+      ['Teacher:', teacher?.name || 'N/A', '', 'Subject:', teacher?.subject || 'N/A'],
+      ['Total Marks:', totalMarks, '', 'Class Average:', classAverage],
+      ['Total Students:', results.length, '', 'Export Date:', new Date().toLocaleDateString('en-PK')],
+      [''],
+      ['#', 'Student Name', 'Roll No', 'Status', 'Obtained Marks', 'Total Marks', 'Percentage (%)', 'Remarks'],
+    ];
+
+    // ── Data rows ─────────────────────────────────
+    const dataRows = results.map((s, i) => [
+      i + 1,
+      s.name,
+      s.roll_no,
+      s.status === 'found' ? 'Registered' : 'New',
+      s.obtained_marks,
+      Number(totalMarks),
+      Number(((s.obtained_marks / totalMarks) * 100).toFixed(1)),
+      s.remarks,
+    ]);
+
+    const allRows = [...headerRows, ...dataRows];
+
+    const ws = XLSX.utils.aoa_to_sheet(allRows);
+
+    // ── Column widths ─────────────────────────────
+    ws['!cols'] = [
+      { wch: 5 },   // #
+      { wch: 22 },  // Name
+      { wch: 12 },  // Roll No
+      { wch: 14 },  // Status
+      { wch: 16 },  // Obtained
+      { wch: 14 },  // Total
+      { wch: 16 },  // Percentage
+      { wch: 30 },  // Remarks
+    ];
+
+    // ── Merge title row A1 across columns ─────────
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // GCUF title
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }, // Dept name
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Results');
+
+    const fileName = `GCUF_${teacher?.subject || 'Evaluation'}_Results_${Date.now()}.xlsx`;
+    XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    XLSX.writeFile(wb, fileName);
+  };
 
   // =========================
   // RESET
@@ -369,11 +429,10 @@ const EvaluateBatch = ({ setLoading }) => {
         <div className="progress-bar">
 
           <div
-            className={`progress-step ${
-              step >= 1
-                ? 'active'
-                : ''
-            }`}
+            className={`progress-step ${step >= 1
+              ? 'active'
+              : ''
+              }`}
           >
             <div className="progress-circle">
               1
@@ -383,19 +442,17 @@ const EvaluateBatch = ({ setLoading }) => {
           </div>
 
           <div
-            className={`progress-line ${
-              step >= 2
-                ? 'active'
-                : ''
-            }`}
+            className={`progress-line ${step >= 2
+              ? 'active'
+              : ''
+              }`}
           ></div>
 
           <div
-            className={`progress-step ${
-              step >= 2
-                ? 'active'
-                : ''
-            }`}
+            className={`progress-step ${step >= 2
+              ? 'active'
+              : ''
+              }`}
           >
             <div className="progress-circle">
               2
@@ -405,19 +462,17 @@ const EvaluateBatch = ({ setLoading }) => {
           </div>
 
           <div
-            className={`progress-line ${
-              step >= 3
-                ? 'active'
-                : ''
-            }`}
+            className={`progress-line ${step >= 3
+              ? 'active'
+              : ''
+              }`}
           ></div>
 
           <div
-            className={`progress-step ${
-              step >= 3
-                ? 'active'
-                : ''
-            }`}
+            className={`progress-step ${step >= 3
+              ? 'active'
+              : ''
+              }`}
           >
             <div className="progress-circle">
               3
@@ -933,7 +988,7 @@ const EvaluateBatch = ({ setLoading }) => {
                           >
 
                             {s.status ===
-                            'found'
+                              'found'
                               ? '✅ Registered'
                               : '🆕 New'}
 
@@ -995,7 +1050,10 @@ const EvaluateBatch = ({ setLoading }) => {
                 🔄 New Evaluation
               </button>
 
-              <button className="btn btn-primary">
+              <button
+                className="btn btn-primary"
+                onClick={handleExportExcel}
+              >
                 📥 Export Results
               </button>
 
