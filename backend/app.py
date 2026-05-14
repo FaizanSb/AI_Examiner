@@ -490,6 +490,16 @@ def evaluate_answer():
         return jsonify({'error': str(e)}), 500
 
 
+# =========================================================
+# Helper — ObjectId normalize karo
+# =========================================================
+def normalize_id(id_val):
+    try:
+        return str(ObjectId(str(id_val).strip()))
+    except Exception:
+        return str(id_val).strip()
+
+
 def _calculate_grade(percentage):
     if percentage >= 90: return 'A+'
     if percentage >= 80: return 'A'
@@ -499,10 +509,13 @@ def _calculate_grade(percentage):
     if percentage >= 40: return 'D'
     return 'F'
 
+
 @app.route('/api/evaluate/bulk', methods=['POST'])
 def bulk_evaluation():
     try:
-        # Single FormData request: file + model_answer + total_marks
+        # =========================================================
+        # Validate PDF File
+        # =========================================================
         if 'file' not in request.files:
             return jsonify({
                 "success": False,
@@ -517,8 +530,11 @@ def bulk_evaluation():
                 "message": "Invalid file type. Only PDF allowed."
             }), 400
 
+        # =========================================================
+        # Get Form Data
+        # =========================================================
         model_answer = request.form.get('model_answer', '')
-        total_marks = request.form.get('total_marks', )
+        total_marks = request.form.get('total_marks', 10)
 
         if not model_answer:
             return jsonify({
@@ -531,86 +547,186 @@ def bulk_evaluation():
         except (ValueError, TypeError):
             total_marks = 10
 
-        # Get teacher info
+        # =========================================================
+        # Get Teacher Info
+        # =========================================================
         teacher_id = get_current_user_id()
+
         teacher_name = 'Unknown'
         subject = ''
+
         if teacher_id:
             teacher = Teacher.find_by_id(teacher_id)
+
             if teacher:
                 teacher_name = teacher.get('name', 'Unknown')
                 subject = teacher.get('subject', '')
 
-        # Save PDF temporarily
+        # =========================================================
+        # Save Uploaded PDF
+        # =========================================================
         pdf_path = pdf_processor.save_uploaded_file(
             pdf,
             app.config['UPLOAD_FOLDER']
         )
 
         try:
-            # Process PDF → Extract + Evaluate in one shot
+            # =====================================================
+            # Process PDF
+            # =====================================================
             results = process_bulk_pdf(
                 pdf_path,
                 model_answer,
                 total_marks,
                 gemini_service
             )
+
         finally:
-            # Always clean up
+            # Always delete temp file
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
 
+        # =========================================================
+        # Validate Results
+        # =========================================================
         if not results:
             return jsonify({
                 "success": False,
                 "message": "Could not extract student data from PDF"
             }), 400
 
-        # NAYA — ye lagao
-        # Save to DB + format response
+        # =========================================================
+        # Save Evaluations
+        # =========================================================
         saved_results = []
+
         for s in results:
 
-            # ✅ bulk_processor ab marks_awarded return karta hai
             obtained = s.get('marks_awarded', 0)
-            percentage = s.get('percentage', round((obtained / total_marks) * 100, 1) if total_marks else 0)
-            grade = s.get('grade', _calculate_grade(percentage))
+
+            percentage = s.get(
+                'percentage',
+                round((obtained / total_marks) * 100, 1)
+                if total_marks else 0
+            )
+
+            grade = s.get(
+                'grade',
+                _calculate_grade(percentage)
+            )
 
             roll_no = str(s.get('roll_no', ''))
             student_name = s.get('name', 'Unknown')
             status = 'new'
 
-            existing_student = Student.find_by_roll_number(roll_no) if roll_no else None
+            # =====================================================
+            # Find Existing Student
+            # =====================================================
+            existing_student = None
+
+            if roll_no:
+                student = Student.find_by_roll_number(roll_no)
+
+                if student:
+                    # ✅ ObjectId vs String dono handle
+                    if normalize_id(student.get('teacher_id')) == normalize_id(teacher_id):
+                        existing_student = student
+                        logger.info(f"✅ Student found: {student.get('name')} (roll: {roll_no})")
+                    else:
+                        logger.warning(
+                            f"⚠️ teacher_id mismatch for roll {roll_no} — "
+                            f"DB: {student.get('teacher_id')} | "
+                            f"Current: {teacher_id}"
+                        )
+
             if existing_student:
                 status = 'found'
                 student_name = existing_student.get('name', student_name)
 
+            else:
+                # =================================================
+                # Create New Student
+                # =================================================
+                try:
+                    new_student = Student.create(
+                        name=student_name,
+                        email=f"{roll_no}@gcuf.edu.pk",
+                        roll_number=roll_no,
+                        class_name=None,
+                        teacher_id=ObjectId(str(teacher_id))  # ✅ ObjectId save karo
+                    )
+                    existing_student = new_student
+                    status = 'new'
+                    logger.info(f"✅ New student created: {student_name} (roll: {roll_no})")
+
+                except Exception as e:
+                    logger.warning(f"Student create failed for {student_name}: {e}")
+
+                    # ✅ Duplicate error — matlab already exists, email se fetch karo
+                    try:
+                        existing_student = Student.find_by_email(
+                            f"{roll_no}@gcuf.edu.pk"
+                        )
+                        if existing_student:
+                            status = 'found'
+                            student_name = existing_student.get('name', student_name)
+                            logger.info(f"✅ Fallback fetch success: {student_name}")
+                        else:
+                            logger.warning(f"Fallback fetch bhi failed: {roll_no}")
+
+                    except Exception as fe:
+                        logger.warning(f"Fallback fetch error: {fe}")
+
+            # =====================================================
+            # Save Evaluation
+            # =====================================================
             try:
                 eval_doc = Evaluation.create(
                     teacher_id=str(teacher_id),
-                    student_id=str(existing_student.get('_id')) if existing_student else None,
+
+                    student_id=(
+                        str(existing_student.get('_id'))
+                        if existing_student else None
+                    ),
+
                     question=subject,
+
                     model_answer=model_answer,
+
                     student_answer=s.get('answer', ''),
+
                     extracted_text=s.get('answer', ''),
+
                     max_marks=total_marks,
+
                     evaluation_result={
                         'marks_awarded': obtained,
                         'percentage': percentage,
                         'grade': grade,
                         'feedback': s.get('feedback', ''),
                         'strengths': s.get('strengths', []),
-                        'missing_points': s.get('missing_points', [])
+                        'missing_points': s.get(
+                            'missing_points',
+                            []
+                        )
                     },
+
                     teacher_name=teacher_name,
+
                     student_name=student_name,
+
                     student_rollno=roll_no
                 )
+
                 eval_id = str(eval_doc['_id'])
+
             except Exception as db_err:
                 logger.warning(f"DB save failed for {student_name}: {db_err}")
                 eval_id = None
 
+            # =====================================================
+            # Append to Results
+            # =====================================================
             saved_results.append({
                 "name": student_name,
                 "roll_no": roll_no,
@@ -618,11 +734,15 @@ def bulk_evaluation():
                 "total_marks": total_marks,
                 "percentage": percentage,
                 "grade": grade,
-                "remarks": s.get('feedback', ''),
+                "remarks": s.get('remarks', ''),
+                "feedback": s.get('feedback', ''),
                 "status": status,
                 "evaluation_id": eval_id
             })
 
+        # =========================================================
+        # Success Response
+        # =========================================================
         return jsonify({
             "success": True,
             "results": serialize_doc(saved_results),
@@ -631,6 +751,7 @@ def bulk_evaluation():
 
     except Exception as e:
         logger.error(f"Bulk evaluation error: {str(e)}")
+
         return jsonify({
             "success": False,
             "message": str(e)

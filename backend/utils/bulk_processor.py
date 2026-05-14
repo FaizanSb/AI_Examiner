@@ -89,7 +89,8 @@ RETURN ONLY RAW JSON (single object, no markdown):
                 pct = round((marks / total_marks) * 100, 1) if total_marks else 0
                 evaluated['percentage'] = pct
                 evaluated['grade'] = _calculate_grade(pct)
-                
+                evaluated['remarks'] = _calculate_remarks(pct)
+
                 results.append(evaluated)
 
         print(f"✅ Evaluated {len(results)} students")
@@ -108,3 +109,8 @@ def _calculate_grade(percentage):
     if percentage >= 50: return 'C'
     if percentage >= 40: return 'D'
     return 'F'
+
+def _calculate_remarks(percentage):
+    if percentage >= 50:
+        return 'Pass'
+    return 'Fail'

@@ -27,6 +27,10 @@ const EvaluateBatch = ({ setLoading }) => {
   const [modelAnswerText, setModelAnswerText] =
     useState('');
 
+  // FIX 1: PDF se extract hua text alag internal state mein
+  const [_extractedPdfText, _setExtractedPdfText] =
+    useState('');
+
   const [modelAnswerFile, setModelAnswerFile] =
     useState(null);
 
@@ -158,7 +162,8 @@ const EvaluateBatch = ({ setLoading }) => {
         );
       }
 
-      setModelAnswerText(text);
+      // FIX 2: Text textarea mein nahi, internal state mein store karo
+      _setExtractedPdfText(text);
 
       setModelAnswerFile(file.name);
 
@@ -187,6 +192,14 @@ const EvaluateBatch = ({ setLoading }) => {
 
     if (!batchFile) return;
 
+    // FIX 3: PDF extracted text ya manually typed text — jo bhi available ho
+    const effectiveModelAnswer = _extractedPdfText || modelAnswerText;
+
+    if (!effectiveModelAnswer.trim()) {
+      setError('Please upload a model answer PDF or paste the text');
+      return;
+    }
+
     setError('');
 
     setIsProcessing(true);
@@ -213,9 +226,10 @@ const EvaluateBatch = ({ setLoading }) => {
 
       formData.append('file', batchFile);
 
+      // FIX 4: effectiveModelAnswer use karo
       formData.append(
         'model_answer',
-        modelAnswerText
+        effectiveModelAnswer
       );
 
       formData.append(
@@ -337,10 +351,7 @@ const EvaluateBatch = ({ setLoading }) => {
   const handleExportExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    // ── Header rows ──────────────────────────────
     const headerRows = [
-      // Logo can be added here if needed, but for now we just have text headers
-      
       ['Government College University Faisalabad (GCUF)'],
       ['Department of Computer Science'],
       [''],
@@ -351,7 +362,6 @@ const EvaluateBatch = ({ setLoading }) => {
       ['#', 'Student Name', 'Roll No', 'Status', 'Obtained Marks', 'Total Marks', 'Percentage (%)', 'Remarks'],
     ];
 
-    // ── Data rows ─────────────────────────────────
     const dataRows = results.map((s, i) => [
       i + 1,
       s.name,
@@ -367,28 +377,25 @@ const EvaluateBatch = ({ setLoading }) => {
 
     const ws = XLSX.utils.aoa_to_sheet(allRows);
 
-    // ── Column widths ─────────────────────────────
     ws['!cols'] = [
-      { wch: 5 },   // #
-      { wch: 22 },  // Name
-      { wch: 12 },  // Roll No
-      { wch: 14 },  // Status
-      { wch: 16 },  // Obtained
-      { wch: 14 },  // Total
-      { wch: 16 },  // Percentage
-      { wch: 30 },  // Remarks
+      { wch: 5 },
+      { wch: 22 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 30 },
     ];
 
-    // ── Merge title row A1 across columns ─────────
     ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // GCUF title
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }, // Dept name
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, 'Results');
 
     const fileName = `GCUF_${teacher?.subject || 'Evaluation'}_Results_${Date.now()}.xlsx`;
-    XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     XLSX.writeFile(wb, fileName);
   };
 
@@ -401,6 +408,9 @@ const EvaluateBatch = ({ setLoading }) => {
     setStep(1);
 
     setModelAnswerText('');
+
+    // FIX 5: Reset mein bhi clear karo
+    _setExtractedPdfText('');
 
     setModelAnswerFile(null);
 
@@ -595,28 +605,17 @@ const EvaluateBatch = ({ setLoading }) => {
 
               </div>
 
-              {modelAnswerFile &&
-                !isExtractingPdf && (
-
-                  <div className="file-selected">
-
-                    <FiCheckCircle color="green" />
-
-                    <span>
-                      {modelAnswerFile}
-                    </span>
-
-                  </div>
-
-                )}
+              {modelAnswerFile && !isExtractingPdf && (
+                <div className="file-selected">
+                  <FiCheckCircle color="green" />
+                  <span>{modelAnswerFile}</span>
+                </div>
+              )}
 
               {isExtractingPdf && (
-
-                <p className="extracting-hint">
-                  ⏳ Extracting text from
-                  PDF...
+                <p style={{ color: '#888', fontSize: '14px', marginTop: '8px' }}>
+                  ⏳ Extracting text from PDF...
                 </p>
-
               )}
 
               <div className="form-group">
@@ -647,12 +646,12 @@ const EvaluateBatch = ({ setLoading }) => {
 
               <button
                 className="btn btn-primary btn-lg"
-                onClick={() =>
-                  setStep(2)
-                }
+                onClick={() => setStep(2)}
                 disabled={
                   !totalMarks ||
-                  isExtractingPdf
+                  isExtractingPdf ||
+                  // Next sirf tab enable ho jab kuch to ho — PDF ya textarea
+                  (!_extractedPdfText && !modelAnswerText.trim())
                 }
               >
                 Next →
@@ -712,6 +711,10 @@ const EvaluateBatch = ({ setLoading }) => {
                 <p className="upload-hint">
                   Combined class answer
                   sheets
+                  
+                </p>
+                <p className="note" style={{ marginTop: '8px', color: 'red' }}>
+                  Make Sure Name and Roll No are clearly mentioned in the PDF for accurate evaluation.
                 </p>
 
               </label>
