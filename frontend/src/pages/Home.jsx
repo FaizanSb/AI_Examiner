@@ -3,7 +3,7 @@ import { FiArrowRight, FiCheckCircle, FiZap, FiBarChart2, FiUser, FiLogOut } fro
 import './Home.css';
 import Login from './login';
 import Signup from './Signup';
-import { redirect } from 'react-router-dom';
+// import { redirect } from 'react-router-dom';
 
 const Home = () => {
   const [showLogin, setShowLogin] = useState(false);
