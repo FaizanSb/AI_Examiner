@@ -3,6 +3,7 @@ import { FiArrowRight, FiCheckCircle, FiZap, FiBarChart2, FiUser, FiLogOut } fro
 import './Home.css';
 import Login from './login';
 import Signup from './Signup';
+import { redirect } from 'react-router-dom';
 
 const Home = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -41,8 +42,8 @@ const Home = () => {
               </>
             ) : (
               <>
-                AI-Powered Answer
-                <span className="gradient-text"> Evaluation</span>
+               AI-Based Academic Evaluation & Performance
+                <span className="gradient-text"> Analytics</span>
               </>
             )}
           </h1>
@@ -77,7 +78,7 @@ const Home = () => {
 
       {/* Features Section */}
       <section className="features">
-        <h2 className="section-title">Why AI Examiner?</h2>
+        <h2 className="section-title">Why PaperLens AI?</h2>
         <div className="features-grid">
           <div className="feature-card">
             <div className="feature-icon"><FiZap size={32} /></div>
@@ -124,8 +125,8 @@ const Home = () => {
           <div className="step-arrow">→</div>
           <div className="step">
             <div className="step-number">2</div>
-            <h3>Submit Student Answer</h3>
-            <p>Upload the student's handwritten or typed answer</p>
+            <h3>Submit Student Answer(s)</h3>
+            <p>Upload a single student answer or a bulk class file for evaluation</p>
           </div>
           <div className="step-arrow">→</div>
           <div className="step">
@@ -169,7 +170,7 @@ const Home = () => {
             </button>
           )}
 
-          <p className="cta-note">Copyright © 2026 AI Examiner. All rights reserved.</p>
+          <p className="cta-note">Copyright © 2026 PaperLens AI. All rights reserved.</p>
         </div>
       </section>
     </div>

@@ -44,13 +44,18 @@ class Student:
             {'$set': data}
         )
 
-    # ✅ FIXED
     @staticmethod
     def get_all(teacher_id=None):
         query = {}
 
         if teacher_id:
-            query['teacher_id'] = teacher_id
+            # ✅ FIX: Dono forms mein query karo — ObjectId aur String
+            # DB mein kuch records ObjectId hain, kuch String — dono match hon
+            try:
+                oid = ObjectId(str(teacher_id))
+                query['teacher_id'] = {'$in': [oid, str(oid)]}
+            except Exception:
+                query['teacher_id'] = str(teacher_id)
 
         return list(Student.get_collection().find(query))
 

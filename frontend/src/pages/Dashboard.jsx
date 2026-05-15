@@ -37,11 +37,22 @@ const gradeColor = (marks, total) => {
 
 const timeAgo = (dateStr) => {
   if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
+
+  // ✅ Fix: agar Z nahi hai string ke end mein toh lagao
+  // taake browser UTC samjhe, local time nahi
+  const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z')
+    ? dateStr + 'Z'
+    : dateStr;
+
+  const diff = Date.now() - new Date(normalized).getTime();
+
+  if (diff < 0) return 'just now';        // clock skew edge case
+
   const mins = Math.floor(diff / 60000);
+  if (mins < 1)  return 'just now';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24)  return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 };
 
@@ -302,7 +313,7 @@ const Dashboard = ({ setLoading }) => {
               <div className="db-empty">
                 <FiFileText size={32} />
                 <p>No evaluations yet</p>
-                <button className="db-cta-btn" onClick={() => navigate('/evaluate')}>
+                <button className="db-cta-btn" onClick={() => navigate('/Evaluate')}>
                   Start Evaluating
                 </button>
               </div>

@@ -26,13 +26,13 @@ function EvaluationHistory() {
   }, []);
 
   const toBase64 = (url) =>
-  fetch(url)
-    .then(res => res.blob())
-    .then(blob => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
-    }));
+    fetch(url)
+      .then(res => res.blob())
+      .then(blob => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }));
 
   const fetchEvaluations = async () => {
     try {
@@ -187,7 +187,7 @@ function EvaluationHistory() {
     </div>
   </div>
   <h1>Evaluation Report</h1>
-  <p>AI Examiner - Assessment Result</p>
+  <p>PaperLens AI - Assessment Result</p>
 </div>
 
           <div class="section">
@@ -263,7 +263,7 @@ function EvaluationHistory() {
 
           <div class="footer">
             <p>Generated on ${new Date().toLocaleString('en-IN')}</p>
-            <p>AI Examiner - Automated Assessment System</p>
+            <p>PaperLens AI - AI-Based Academic Evaluation & Performance Analytics</p>
           </div>
         </div>
       </body>
