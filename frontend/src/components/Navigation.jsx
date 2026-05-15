@@ -138,7 +138,7 @@ const Navigation = () => {
           onClick={handleMobileClose}
         >
           <span className="logo-icon">📝</span>
-          AI Examiner
+          PaperLens AI
         </Link>
 
         {/* MOBILE MENU BUTTON */}

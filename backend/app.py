@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import Config
@@ -45,6 +47,7 @@ pdf_processor = PDFProcessor()
 gemini_service = GeminiService(Config.GEMINI_API_KEY)
 
 
+# NAYA — yeh lagao
 def serialize_doc(doc):
     """Convert MongoDB document to JSON serializable format"""
     if doc is None:
@@ -52,13 +55,17 @@ def serialize_doc(doc):
     if isinstance(doc, list):
         return [serialize_doc(item) for item in doc]
     if isinstance(doc, dict):
-        doc = doc.copy()
-        if '_id' in doc:
-            doc['_id'] = str(doc['_id'])
-        # Convert roll_number to rollNumber for frontend consistency
-        if 'roll_number' in doc:
-            doc['rollNumber'] = doc['roll_number']
-        return doc
+        result = {}
+        for k, v in doc.items():
+            result[k] = serialize_doc(v)
+        # Frontend consistency
+        if 'roll_number' in result:
+            result['rollNumber'] = result['roll_number']
+        return result
+    if isinstance(doc, ObjectId):
+        return str(doc)
+    if isinstance(doc, datetime):
+        return doc.isoformat()
     return doc
 
 
@@ -306,7 +313,7 @@ def get_all_students():
     try:
         user_id = get_current_user_id()
 
-        print("Current User ID:", user_id)
+        #print("Current User ID:", user_id)
 
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
@@ -483,40 +490,272 @@ def evaluate_answer():
         return jsonify({'error': str(e)}), 500
 
 
+# =========================================================
+# Helper — ObjectId normalize karo
+# =========================================================
+def normalize_id(id_val):
+    try:
+        return str(ObjectId(str(id_val).strip()))
+    except Exception:
+        return str(id_val).strip()
+
+
+def _calculate_grade(percentage):
+    if percentage >= 90: return 'A+'
+    if percentage >= 80: return 'A'
+    if percentage >= 70: return 'B+'
+    if percentage >= 60: return 'B'
+    if percentage >= 50: return 'C'
+    if percentage >= 40: return 'D'
+    return 'F'
+
+
 @app.route('/api/evaluate/bulk', methods=['POST'])
 def bulk_evaluation():
     try:
+        # =========================================================
+        # Validate PDF File
+        # =========================================================
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return jsonify({
+                "success": False,
+                "message": "PDF file required"
+            }), 400
 
         pdf = request.files['file']
-        teacher_answer = request.form.get('teacher_answer')
-        teacher_name = request.form.get('teacher_name')
-        teacher_email = request.form.get('teacher_email')
 
-        pdf_path = pdf_processor.save_uploaded_file(pdf, app.config['UPLOAD_FOLDER'])
+        if not Config.allowed_file(pdf.filename):
+            return jsonify({
+                "success": False,
+                "message": "Invalid file type. Only PDF allowed."
+            }), 400
 
-        result = process_bulk_pdf(
-            pdf_path,
-            teacher_answer,
-            {
-                "name": teacher_name,
-                "email": teacher_email
-            },
-            gemini_service
+        # =========================================================
+        # Get Form Data
+        # =========================================================
+        model_answer = request.form.get('model_answer', '')
+        total_marks = request.form.get('total_marks', 10)
+
+        if not model_answer:
+            return jsonify({
+                "success": False,
+                "message": "Model answer is required"
+            }), 400
+
+        try:
+            total_marks = int(total_marks)
+        except (ValueError, TypeError):
+            total_marks = 10
+
+        # =========================================================
+        # Get Teacher Info
+        # =========================================================
+        teacher_id = get_current_user_id()
+
+        teacher_name = 'Unknown'
+        subject = ''
+
+        if teacher_id:
+            teacher = Teacher.find_by_id(teacher_id)
+
+            if teacher:
+                teacher_name = teacher.get('name', 'Unknown')
+                subject = teacher.get('subject', '')
+
+        # =========================================================
+        # Save Uploaded PDF
+        # =========================================================
+        pdf_path = pdf_processor.save_uploaded_file(
+            pdf,
+            app.config['UPLOAD_FOLDER']
         )
 
+        try:
+            # =====================================================
+            # Process PDF
+            # =====================================================
+            results = process_bulk_pdf(
+                pdf_path,
+                model_answer,
+                total_marks,
+                gemini_service
+            )
+
+        finally:
+            # Always delete temp file
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+
+        # =========================================================
+        # Validate Results
+        # =========================================================
+        if not results:
+            return jsonify({
+                "success": False,
+                "message": "Could not extract student data from PDF"
+            }), 400
+
+        # =========================================================
+        # Save Evaluations
+        # =========================================================
+        saved_results = []
+
+        for s in results:
+
+            obtained = s.get('marks_awarded', 0)
+
+            percentage = s.get(
+                'percentage',
+                round((obtained / total_marks) * 100, 1)
+                if total_marks else 0
+            )
+
+            grade = s.get(
+                'grade',
+                _calculate_grade(percentage)
+            )
+
+            roll_no = str(s.get('roll_no', ''))
+            student_name = s.get('name', 'Unknown')
+            status = 'new'
+
+            # =====================================================
+            # Find Existing Student
+            # =====================================================
+            existing_student = None
+
+            if roll_no:
+                student = Student.find_by_roll_number(roll_no)
+
+                if student:
+                    # ✅ ObjectId vs String dono handle
+                    if normalize_id(student.get('teacher_id')) == normalize_id(teacher_id):
+                        existing_student = student
+                        logger.info(f"✅ Student found: {student.get('name')} (roll: {roll_no})")
+                    else:
+                        logger.warning(
+                            f"⚠️ teacher_id mismatch for roll {roll_no} — "
+                            f"DB: {student.get('teacher_id')} | "
+                            f"Current: {teacher_id}"
+                        )
+
+            if existing_student:
+                status = 'found'
+                student_name = existing_student.get('name', student_name)
+
+            else:
+                # =================================================
+                # Create New Student
+                # =================================================
+                try:
+                    new_student = Student.create(
+                        name=student_name,
+                        email=f"{roll_no}@gcuf.edu.pk",
+                        roll_number=roll_no,
+                        class_name=None,
+                        teacher_id=ObjectId(str(teacher_id))  # ✅ ObjectId save karo
+                    )
+                    existing_student = new_student
+                    status = 'new'
+                    logger.info(f"✅ New student created: {student_name} (roll: {roll_no})")
+
+                except Exception as e:
+                    logger.warning(f"Student create failed for {student_name}: {e}")
+
+                    # ✅ Duplicate error — matlab already exists, email se fetch karo
+                    try:
+                        existing_student = Student.find_by_email(
+                            f"{roll_no}@gcuf.edu.pk"
+                        )
+                        if existing_student:
+                            status = 'found'
+                            student_name = existing_student.get('name', student_name)
+                            logger.info(f"✅ Fallback fetch success: {student_name}")
+                        else:
+                            logger.warning(f"Fallback fetch bhi failed: {roll_no}")
+
+                    except Exception as fe:
+                        logger.warning(f"Fallback fetch error: {fe}")
+
+            # =====================================================
+            # Save Evaluation
+            # =====================================================
+            try:
+                eval_doc = Evaluation.create(
+                    teacher_id=str(teacher_id),
+
+                    student_id=(
+                        str(existing_student.get('_id'))
+                        if existing_student else None
+                    ),
+
+                    question=subject,
+
+                    model_answer=model_answer,
+
+                    student_answer=s.get('answer', ''),
+
+                    extracted_text=s.get('answer', ''),
+
+                    max_marks=total_marks,
+
+                    evaluation_result={
+                        'marks_awarded': obtained,
+                        'percentage': percentage,
+                        'grade': grade,
+                        'feedback': s.get('feedback', ''),
+                        'strengths': s.get('strengths', []),
+                        'missing_points': s.get(
+                            'missing_points',
+                            []
+                        )
+                    },
+
+                    teacher_name=teacher_name,
+
+                    student_name=student_name,
+
+                    student_rollno=roll_no
+                )
+
+                eval_id = str(eval_doc['_id'])
+
+            except Exception as db_err:
+                logger.warning(f"DB save failed for {student_name}: {db_err}")
+                eval_id = None
+
+            # =====================================================
+            # Append to Results
+            # =====================================================
+            saved_results.append({
+                "name": student_name,
+                "roll_no": roll_no,
+                "obtained_marks": obtained,
+                "total_marks": total_marks,
+                "percentage": percentage,
+                "grade": grade,
+                "remarks": s.get('remarks', ''),
+                "feedback": s.get('feedback', ''),
+                "status": status,
+                "evaluation_id": eval_id
+            })
+
+        # =========================================================
+        # Success Response
+        # =========================================================
         return jsonify({
             "success": True,
-            "status": "success",
-            "students": result,
-            "count": len(result)
+            "results": serialize_doc(saved_results),
+            "count": len(saved_results)
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Bulk evaluation error: {str(e)}")
 
-
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 @app.route('/api/evaluations', methods=['GET'])
 def get_all_evaluations():
     try:
