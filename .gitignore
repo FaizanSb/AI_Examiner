@@ -3,3 +3,8 @@ __pycache__/
 node_modules/
 .eslintcache
 .cache/
+node_modules/
+.env
+.env.production
+.env.local
+.env.*
